@@ -57,7 +57,7 @@ static void init()
     config.log_level = INFO;
     strcpy(config.log_file, DEFAULT_LOG_FILE);
 
-    get_conf();
+    /* get_conf(); */
     logging_init();
 }
 
