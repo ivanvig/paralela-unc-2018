@@ -112,6 +112,7 @@ retval_t delete_node(Node_t *node)
             }   
         }
 
+        // borro nodo y linkeo nodos contiguos
         if (before != NULL) {
             before->next = node->next;
         }else {
