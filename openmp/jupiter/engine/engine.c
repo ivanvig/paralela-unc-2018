@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <omp.h>
 #include "board.h"
 #include "generation.h"
 #include "evaluation.h"
@@ -10,6 +11,9 @@
 #include "fen.h"
 #include "logging.h"
 
+#define MAX_DEPTH 4*10e10
+int n;
+
 static void (*log_func)(const char *info) = NULL;
 
 typedef struct {
@@ -20,29 +24,87 @@ typedef struct {
     uint32_t time;
 } engine_info_t;
 
-static void generate_nodes(Node_t *node)
+static void generate_nodes_ser(Node_t *node)
 {
     Node_t *aux = node;
 
     while(aux != NULL) {
         if (aux->child != NULL) {
-            generate_nodes(aux->child);
-        } else { 
+            generate_nodes_ser(aux->child);
+        } else {
             get_moves(aux);
         }
         aux = aux->next;
     }
 }
 
+
+/* ESTO ARRANCA CON UN NODO SIN HIJOS ENTONCES HACES UN GET_MOVES() */
+/*Y TE GENERA TODOS LOS MOVIMIENTOS POSIBLES POR CADA PIEZA Y VUELVE, EN CASO DE SER EL DEPTH */
+/* MAYOR QUE 1, VUELVE A ENTRAR Y VUELVE A GENERAR TOODS LOS MOVIMIENTOS POR CADA HIJO, */
+/*CUANDO SE CUMPLE EL DEPTH, SE BUSCA LA MEJOR JUGADA Y SE DESTRUYE EL GRAFO */
+static void generate_nodes_aux(Node_t *node, int* n)
+{
+    /* printf("%d\n",*n); */
+    /* if (*n >= MAX_DEPTH) { */
+    /*     generate_nodes_ser(node); */
+    /*     return; */
+    /* } */
+
+    Node_t *aux = node;
+
+    while(aux != NULL) {
+        if (aux->child != NULL) {
+#pragma omp atomic
+            (*n)++;
+            /* *n += 1; */
+#pragma omp task if (*n < MAX_DEPTH)
+            generate_nodes_aux(aux->child, n);
+        } else {
+            get_moves(aux);
+        }
+        aux = aux->next;
+    }
+}
+static void generate_nodes(Node_t *node)
+{
+    n = 1;
+    generate_nodes_aux(node, &n);
+}
+/* { */
+/*     Node_t *aux = node; */
+
+/*     while(aux != NULL) { */
+/*         if (aux->child != NULL) { */
+/* #pragma omp task */
+/*             generate_nodes(aux->child); */
+/*         } else { */
+/*             get_moves(aux); */
+/*         } */
+/*         aux = aux->next; */
+/*     } */
+/* } */
+
 static engine_info_t engine_think(Node_t *node)
 {
     engine_info_t info;
     clock_t start, end;
-    
+    double start_time, end_time;
+
     start = get_clock_ms();
 
-    generate_nodes(node);
+    start_time = omp_get_wtime();
+    printf("N_THREADS: %d\n", omp_get_max_threads());
+#pragma omp parallel
+    {
+#pragma omp single
+        {
+            generate_nodes(node);
+        }
+    }
     get_best_move(node, info.mov);
+
+    printf("TIEMPO: %f\n", omp_get_wtime() - start_time);
 
     end = get_clock_ms();
     info.time = clock_diff_ms(end, start);
@@ -81,8 +143,8 @@ static void log_info(engine_info_t info, uint8_t depth, uint32_t elapsed_time)
 
     if (log_func != NULL) {
         sprintf(msg, "info depth %d score cp %d time %d nodes %d nps %d",
-              depth, info.score, elapsed_time, info.nodes_count,
-              info.nps);
+                depth, info.score, elapsed_time, info.nodes_count,
+                info.nps);
         log_func(msg);
     }
 }
