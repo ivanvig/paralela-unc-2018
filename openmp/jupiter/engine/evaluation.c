@@ -11,11 +11,13 @@
 
 static int material_evaluation(Board board)
 {
-    int material = 0;
+    register int material = 0;
+    register int16_t* row_ptr;
 
     for (int i = 0; i < 8; i++) {
+        row_ptr = board[i];
         for (int j = 0; j < 8; j++) {
-            material += board[i][j];
+            material += *(row_ptr++);
         }
     }
     return material;
@@ -23,36 +25,40 @@ static int material_evaluation(Board board)
 
 static int32_t pieces_evaluation(Board board)
 {
-    int32_t material = 0;
+    register int32_t material;
+    register int16_t* row_ptr;
 
     for (int i = 0; i < 8; i++) {
+        row_ptr = board[i];
         for (int j = 0; j < 8; j++) {
-            switch(board[i][j]) {
+            /* switch(board[i][j]) { */
+            switch(*(row_ptr++)) {
                 case PAWN_B:
                 case PAWN_W:
-                    material += pawn_evaluation(board, i, j);
+                    material = pawn_evaluation(board, i, j);
                     break;
                 case ROOK_B:
                 case ROOK_W:
-                    material += rook_evaluation(board, i, j);
+                    material = rook_evaluation(board, i, j);
                     break;
                 case KNIGHT_B:
                 case KNIGHT_W:
-                    material += knight_evaluation(board, i, j);
+                    material = knight_evaluation(board, i, j);
                     break;
                 case BISHOP_B:
                 case BISHOP_W:
-                    material += bishop_evaluation(board, i, j);
+                    material = bishop_evaluation(board, i, j);
                     break;
                 case QUEEN_B:
                 case QUEEN_W:
-                    material += queen_evaluation(board, i, j);
+                    material = queen_evaluation(board, i, j);
                     break;
                 case KING_B:
                 case KING_W:
-                    material += king_evaluation(board, i, j);
+                    material = king_evaluation(board, i, j);
                     break;
                 default:
+                    material = 0;
                     break;
             }
         }
@@ -62,7 +68,7 @@ static int32_t pieces_evaluation(Board board)
 
 static bool piece_attack_square(Board board, square from, square to)
 {
-    bool attaked;
+    register bool attaked;
     switch(board[from[0]][from[1]]) {
         case PAWN_B:
         case PAWN_W:
