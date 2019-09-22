@@ -105,9 +105,11 @@ static engine_info_t engine_think(Node_t *node)
 #pragma omp single
         {
             generate_nodes(node);
+#pragma omp taskwait
+            get_best_move(node, info.mov);
         }
     }
-    get_best_move(node, info.mov);
+    /* get_best_move(node, info.mov); */
 
     printf("TIEMPO: %f\n", omp_get_wtime() - start_time);
 
