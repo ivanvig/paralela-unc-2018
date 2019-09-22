@@ -6,8 +6,8 @@
 
 #include <stdlib.h>
 
-int MAX_DEPTH;
-int n = 1;
+unsigned int MAX_DEPTH;
+unsigned int n = 1;
 char* asd;
 
 static int32_t get_minimax(Node_t *node)
@@ -43,7 +43,7 @@ static int32_t get_minimax(Node_t *node)
 /*     } */
 /* } */
 
-static void search_aux(Node_t *root, int* n)
+static void search_aux(Node_t *root, unsigned int* n)
 {
     Node_t *aux = root;
 

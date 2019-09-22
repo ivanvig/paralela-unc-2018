@@ -15,8 +15,8 @@
 
 /* #define MAX_DEPTH 4*10e10 */
 char* asd;
-int MAX_DEPTH;
-int n;
+unsigned int MAX_DEPTH;
+unsigned int n;
 
 static void (*log_func)(const char *info) = NULL;
 
@@ -47,7 +47,7 @@ static void generate_nodes_ser(Node_t *node)
 /*Y TE GENERA TODOS LOS MOVIMIENTOS POSIBLES POR CADA PIEZA Y VUELVE, EN CASO DE SER EL DEPTH */
 /* MAYOR QUE 1, VUELVE A ENTRAR Y VUELVE A GENERAR TOODS LOS MOVIMIENTOS POR CADA HIJO, */
 /*CUANDO SE CUMPLE EL DEPTH, SE BUSCA LA MEJOR JUGADA Y SE DESTRUYE EL GRAFO */
-static void generate_nodes_aux(Node_t *node, int* n)
+static void generate_nodes_aux(Node_t *node, unsigned int* n)
 {
     /* printf("%d\n",*n); */
     /* if (*n >= MAX_DEPTH) { */
