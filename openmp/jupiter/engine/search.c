@@ -56,6 +56,7 @@ static void search_aux(Node_t *root, int* n)
                 (*n)++;
 #pragma omp task if (*n < MAX_DEPTH)
                 search_aux(aux->child, n);
+#pragma omp taskwait
                 aux->value = get_minimax(aux);
             }
         }
