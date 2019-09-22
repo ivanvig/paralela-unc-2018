@@ -11,7 +11,11 @@
 #include "fen.h"
 #include "logging.h"
 
-#define MAX_DEPTH 4*10e10
+#include <stdlib.h> // getenv
+
+/* #define MAX_DEPTH 4*10e10 */
+char* asd;
+int MAX_DEPTH;
 int n;
 
 static void (*log_func)(const char *info) = NULL;
@@ -68,6 +72,7 @@ static void generate_nodes_aux(Node_t *node, int* n)
 }
 static void generate_nodes(Node_t *node)
 {
+    MAX_DEPTH = strtol(getenv("MAX_DEPTH"), &asd, 10);
     n = 1;
     generate_nodes_aux(node, &n);
 }
