@@ -17,7 +17,7 @@ static int material_evaluation(Board board)
     for (int i = 0; i < 8; i++) {
         row_ptr = board[i];
         for (int j = 0; j < 8; j++) {
-            material += *(row_ptr++);
+            material += row_ptr[j];
         }
     }
     return material;
@@ -32,7 +32,7 @@ static int32_t pieces_evaluation(Board board)
         row_ptr = board[i];
         for (int j = 0; j < 8; j++) {
             /* switch(board[i][j]) { */
-            switch(*(row_ptr++)) {
+            switch(row_ptr[j]) {
                 case PAWN_B:
                 case PAWN_W:
                     material = pawn_evaluation(board, i, j);
@@ -112,9 +112,11 @@ static int32_t center_control(Board board)
     square f4 = {FILE_4, COL_F};
     square f5 = {FILE_5, COL_F};
 
+    register int16_t* row_ptr;
     for (int i = 0; i < 8; i++) {
+        row_ptr = board[i];
         for (int j = 0; j < 8; j++) {
-            if (board[i][j] != 0) {
+            if (row_ptr[j] != 0) {
                 square from = {i, j};
                 turn = TURN(board, i, j);
 
