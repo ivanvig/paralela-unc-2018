@@ -1,5 +1,5 @@
-make clean > /dev/null
-make > /dev/null
+# make clean > /dev/null
+# make > /dev/null
 mkfifo fifocom
 # exec 3<> /tmp/asdasd
 (tail -f fifocom & (echo $!>/tmp/asdasd)) | MAX_DEPTH="$2" OMP_NUM_THREADS="$1" ./jupiter &
