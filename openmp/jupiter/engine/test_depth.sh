@@ -1,4 +1,4 @@
-FNAME="thd_tiempo.csv"
+FNAME="depth_tiempo.csv"
 rm thd_tiempo.csv 2> /dev/null
 # N_THREADS=(1 2 4 6 8 12 16 32 64)
 N_THREADS=6
