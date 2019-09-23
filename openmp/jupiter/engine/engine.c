@@ -17,6 +17,7 @@
 char* asd;
 unsigned int MAX_DEPTH;
 unsigned int n;
+double start_time, end_time;
 
 static void (*log_func)(const char *info) = NULL;
 
@@ -92,14 +93,13 @@ static void generate_nodes(Node_t *node)
 
 static engine_info_t engine_think(Node_t *node)
 {
+    register float ayudaporfavor;
     engine_info_t info;
     clock_t start, end;
-    double start_time, end_time;
 
     start = get_clock_ms();
 
     start_time = omp_get_wtime();
-    printf("N_THREADS: %d\n", omp_get_max_threads());
 #pragma omp parallel
     {
 #pragma omp single
@@ -109,9 +109,10 @@ static engine_info_t engine_think(Node_t *node)
             get_best_move(node, info.mov);
         }
     }
+    ayudaporfavor = omp_get_wtime();
+    end_time = ayudaporfavor - start_time;
     /* get_best_move(node, info.mov); */
 
-    printf("TIEMPO: %f\n", omp_get_wtime() - start_time);
 
     end = get_clock_ms();
     info.time = clock_diff_ms(end, start);
@@ -171,13 +172,14 @@ char* engine_go(Node_t *node, engine_cfg_t cfg)
     get_fen_from_node(node, fen);
     LOG2(DEBUG, "Board: ", fen);
 
+    printf("N_THREADS: %d\n", omp_get_max_threads());
     while (keep_running(cfg, elapsed_time, current_depth)) {
         info = engine_think(node);
         current_depth++;
         elapsed_time += info.time;
         log_info(info, current_depth, elapsed_time);
     } 
-
+    printf("TIEMPO: %f\n", end_time);
     delete_node(node);
     return info.mov;
 } 

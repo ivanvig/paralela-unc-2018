@@ -281,7 +281,7 @@ static void uci_go(command_t *cmd)
     }
         
         
-    engine_set_log_func(send_command);
+    /* engine_set_log_func(send_command); */
     mov = engine_go(node, cfg);
     sprintf(cmd_mov, "%s %s", "bestmove", mov);
     send_command(cmd_mov);
