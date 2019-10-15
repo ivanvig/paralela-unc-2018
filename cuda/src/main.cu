@@ -2,7 +2,9 @@
 
 // #define LIST_SIZE 1610612736 //6 GB of ints
 //#define LIST_SIZE 209715200 //500 MB of ints
-#define LIST_SIZE 2048
+// #define LIST_SIZE 1048576 // 1MB of ints
+#define LIST_SIZE 65536
+// #define LIST_SIZE 4096
 #define BLOCK_SIZE 1024
 #define CUDA_CALL(x) {cudaError_t cuda_error__ = (x); if (cuda_error__) printf("CUDA error: " #x " returned \"%s\"\n", cudaGetErrorString(cuda_error__));}
 
@@ -34,7 +36,11 @@ int main (){
   printf("Generando lista aleatoria de %i elementos\n", LIST_SIZE);
   for (int i = 0; i<LIST_SIZE; i++){
     random_numbers[i] = rand()%20;
+    // random_numbers[i] = LIST_SIZE - i;
+    // random_numbers[i] = 0;
   }
+  // random_numbers[0] = 111;
+  // random_numbers[LIST_SIZE-1] = -1;
   int start_print = 0;
   int n_prints = 2048;
   printf("Antes de gpu: Elementos desde %i hasta %i \n", start_print, start_print+n_prints);
@@ -47,9 +53,12 @@ int main (){
 
   printf("Chequeando si la lista esta ordenada... \n");
   int elem;
-  if (elem = assert_sorted(random_numbers, LIST_SIZE))
+  if (elem = assert_sorted(random_numbers, LIST_SIZE)) {
     printf("LISTA MAL ORDENADA EN ELEM N %i \n", elem);
-  else
+    for (int i=((elem-100) > 0)*(elem-100); i < (((elem+100) < LIST_SIZE)*(elem+100) + ((elem+100) >= LIST_SIZE)*LIST_SIZE); i++)
+      printf("%i ", random_numbers[i]);
+    printf("\n");
+  } else
     printf("LISTA BIEN ORDENADA \n");
 
   printf("Despues de gpu: Elementos desde %i hasta %i\n", start_print, start_print+n_prints);
@@ -66,14 +75,17 @@ void odd_even_bubble_sort_global (int32_t * list, int32_t list_size)
 {
   int32_t * device_list_ref;
 
-  dim3 dimGrid ((uint)(LIST_SIZE/(2*BLOCK_SIZE)), 1, 1); //TODO: Usar ceil
+  // dim3 dimGrid ((uint)(LIST_SIZE/(2*BLOCK_SIZE)), 1, 1); //TODO: Usar ceil
+  dim3 dimGrid (1, 1, 1); //TODO: Usar ceil
 	dim3 dimBlock (BLOCK_SIZE, 1, 1);
 
   CUDA_CALL(cudaMalloc((void **) &device_list_ref, list_size*sizeof(int32_t)));
   CUDA_CALL(cudaMemcpy(device_list_ref, list, list_size*sizeof(int32_t), cudaMemcpyHostToDevice));
 
   printf("Llamando al kernel... \n");
-  koronel<<<dimGrid, dimBlock>>>(device_list_ref, list_size);
+  for (int i = 0; i < LIST_SIZE; i++)
+    for (int j = 0; j < LIST_SIZE/BLOCK_SIZE; j++)
+      koronel<<<dimGrid, dimBlock>>>((device_list_ref + BLOCK_SIZE*j + (i&1)), BLOCK_SIZE - (BLOCK_SIZE - (LIST_SIZE - (i&1))%BLOCK_SIZE)*(((j+1)*BLOCK_SIZE + (i&1)) > LIST_SIZE));
 
   CUDA_CALL(cudaMemcpy(list, device_list_ref, list_size*sizeof(int32_t), cudaMemcpyDeviceToHost));
   CUDA_CALL(cudaFree(device_list_ref));
