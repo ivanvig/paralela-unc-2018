@@ -3,8 +3,8 @@
 // #define LIST_SIZE 1610612736 //6 GB of ints
 //#define LIST_SIZE 209715200 //500 MB of ints
 // #define LIST_SIZE 1048576 // 1MB of ints
-#define LIST_SIZE 65536
-// #define LIST_SIZE 4096
+// #define LIST_SIZE 65536
+#define LIST_SIZE 16384
 #define BLOCK_SIZE 1024
 #define CUDA_CALL(x) {cudaError_t cuda_error__ = (x); if (cuda_error__) printf("CUDA error: " #x " returned \"%s\"\n", cudaGetErrorString(cuda_error__));}
 
@@ -15,7 +15,27 @@ void odd_even_bubble_sort_global(int32_t * list, int32_t list_size);
 int assert_sorted (int * list, int list_size);
 
 __global__
-void koronel(int32_t * list, int32_t list_size)
+void shared_koronel(int32_t * list, int32_t list_size)
+{
+  __shared__ int32_t slist[2*BLOCK_SIZE];
+
+  int64_t pos = 2*(blockDim.x * blockIdx.x + threadIdx.x);
+
+  slist[pos] = list[pos];
+  slist[pos+1] = list[pos+1];
+  for (int64_t i = 0; i<list_size; i++){
+    int64_t pos_oddeven = pos + (i&1);
+    if (pos_oddeven < list_size-1)
+      if(slist[pos_oddeven]>slist[pos_oddeven+1])
+        SWAP(&slist[pos_oddeven], &slist[pos_oddeven+1]);
+    __syncthreads();
+  }
+  list[pos] = slist[pos];
+  list[pos+1] = slist[pos+1];
+}
+
+__global__
+void global_koronel(int32_t * list, int32_t list_size)
 {
   int64_t pos = 2*(blockDim.x * blockIdx.x + threadIdx.x);
 
@@ -84,8 +104,11 @@ void odd_even_bubble_sort_global (int32_t * list, int32_t list_size)
 
   printf("Llamando al kernel... \n");
   for (int i = 0; i < LIST_SIZE; i++)
-    for (int j = 0; j < LIST_SIZE/BLOCK_SIZE; j++)
-      koronel<<<dimGrid, dimBlock>>>((device_list_ref + BLOCK_SIZE*j + (i&1)), BLOCK_SIZE - (BLOCK_SIZE - (LIST_SIZE - (i&1))%BLOCK_SIZE)*(((j+1)*BLOCK_SIZE + (i&1)) > LIST_SIZE));
+    for (int j = 0; j < LIST_SIZE/(2*BLOCK_SIZE); j++) {
+      int win_size = 2*BLOCK_SIZE - (2*BLOCK_SIZE - (LIST_SIZE - (i&1))%(2*BLOCK_SIZE))*(((j+1)*2*BLOCK_SIZE + (i&1)) > LIST_SIZE);
+      // shared_koronel<<<dimGrid, dimBlock, sizeof(int32_t)*win_size>>>((device_list_ref + 2*BLOCK_SIZE*j + (i&1)), win_size);
+      shared_koronel<<<dimGrid, dimBlock>>>((device_list_ref + 2*BLOCK_SIZE*j + (i&1)), win_size);
+    }
 
   CUDA_CALL(cudaMemcpy(list, device_list_ref, list_size*sizeof(int32_t), cudaMemcpyDeviceToHost));
   CUDA_CALL(cudaFree(device_list_ref));
