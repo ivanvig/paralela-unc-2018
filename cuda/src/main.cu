@@ -12,6 +12,7 @@ __device__
 inline void SWAP(int32_t *_a,int32_t *_b){int32_t __aux; __aux = *_a; *_a = *_b; *_b = __aux;}
 
 void odd_even_bubble_sort_global(int32_t * list, int32_t list_size);
+void odd_even_bubble_sort_shared(int32_t * list, int32_t list_size);
 int assert_sorted (int * list, int list_size);
 
 __global__
@@ -51,41 +52,71 @@ void global_koronel(int32_t * list, int32_t list_size)
 int main (){
   srand(time(NULL));
 
-  int * random_numbers = (int *) malloc(sizeof(int)*LIST_SIZE);
+  int * random_numbers_global = (int *) malloc(sizeof(int)*LIST_SIZE);
+  int * random_numbers_shared = (int *) malloc(sizeof(int)*LIST_SIZE);
 
   printf("Generando lista aleatoria de %i elementos\n", LIST_SIZE);
   for (int i = 0; i<LIST_SIZE; i++){
-    random_numbers[i] = rand()%20;
-    // random_numbers[i] = LIST_SIZE - i;
-    // random_numbers[i] = 0;
+    random_numbers_global[i] = rand()%20;
+    // random_numbers_global[i] = LIST_SIZE - i;
   }
-  // random_numbers[0] = 111;
-  // random_numbers[LIST_SIZE-1] = -1;
+
+  memcpy(random_numbers_shared, random_numbers_global, LIST_SIZE);
   int start_print = 0;
-  int n_prints = 2048;
-  printf("Antes de gpu: Elementos desde %i hasta %i \n", start_print, start_print+n_prints);
+  int n_prints = 256;
+  int elem;
+
+  printf("Lista antes de gpu: Elementos desde %i hasta %i \n", start_print, start_print+n_prints);
   for (int i=start_print; i< start_print+n_prints; i++){
-    printf("%i ", random_numbers[i]);
+    printf("%i ", random_numbers_global[i]);
   }
   printf("\n");
-  printf("Odd even bubble sort con memoria global \n");
-  odd_even_bubble_sort_global(random_numbers, LIST_SIZE);
 
-  printf("Chequeando si la lista esta ordenada... \n");
-  int elem;
-  if (elem = assert_sorted(random_numbers, LIST_SIZE)) {
+  //*************************************
+  // ODD-EVEN BUBBLE SORT CON GLOBAL MEM
+  //*************************************
+
+  printf("Odd even bubble sort con memoria global \n");
+  odd_even_bubble_sort_global(random_numbers_global, LIST_SIZE);
+
+  printf("Despues de gpu (global): Elementos desde %i hasta %i\n", start_print, start_print+n_prints);
+  for (int i=start_print; i< start_print+n_prints; i++){
+    printf("%i ", random_numbers_global[i]);
+  }
+  printf("\n");
+
+  printf("Chequeando si la lista con global mem esta ordenada... \n");
+  if (elem = assert_sorted(random_numbers_global, LIST_SIZE)) {
     printf("LISTA MAL ORDENADA EN ELEM N %i \n", elem);
     for (int i=((elem-100) > 0)*(elem-100); i < (((elem+100) < LIST_SIZE)*(elem+100) + ((elem+100) >= LIST_SIZE)*LIST_SIZE); i++)
-      printf("%i ", random_numbers[i]);
+      printf("%i ", random_numbers_global[i]);
     printf("\n");
   } else
-    printf("LISTA BIEN ORDENADA \n");
+    printf("LISTA CON GLOBAL MEM BIEN ORDENADA \n");
 
-  printf("Despues de gpu: Elementos desde %i hasta %i\n", start_print, start_print+n_prints);
+  printf("Finalizado sort con memoria global \n");
+
+  //*************************************
+  // ODD-EVEN BUBBLE SORT CON SHARED MEM
+  //*************************************
+
+  printf("Odd even bubble sort con memoria shared \n");
+  odd_even_bubble_sort_shared(random_numbers_shared, LIST_SIZE);
+
+  printf("Despues de gpu (shared): Elementos desde %i hasta %i\n", start_print, start_print+n_prints);
   for (int i=start_print; i< start_print+n_prints; i++){
-    printf("%i ", random_numbers[i]);
+    printf("%i ", random_numbers_shared[i]);
   }
   printf("\n");
+
+  printf("Chequeando si la lista con shared mem esta ordenada... \n");
+  if (elem = assert_sorted(random_numbers_shared, LIST_SIZE)) {
+    printf("LISTA MAL ORDENADA EN ELEM N %i \n", elem);
+    for (int i=((elem-100) > 0)*(elem-100); i < (((elem+100) < LIST_SIZE)*(elem+100) + ((elem+100) >= LIST_SIZE)*LIST_SIZE); i++)
+      printf("%i ", random_numbers_shared[i]);
+    printf("\n");
+  } else
+    printf("LISTA CON SHARED MEM BIEN ORDENADA \n");
 
   return 0;
 }
@@ -102,13 +133,41 @@ void odd_even_bubble_sort_global (int32_t * list, int32_t list_size)
   CUDA_CALL(cudaMalloc((void **) &device_list_ref, list_size*sizeof(int32_t)));
   CUDA_CALL(cudaMemcpy(device_list_ref, list, list_size*sizeof(int32_t), cudaMemcpyHostToDevice));
 
-  printf("Llamando al kernel... \n");
-  for (int i = 0; i < LIST_SIZE; i++)
+  printf("Llamando al kernel con global memory... \n");
+  for (int i = 0; i < LIST_SIZE; i++){
+    if (i%(LIST_SIZE/10)==0)
+      printf("%d/100...\n", 10*i/(LIST_SIZE/10));
     for (int j = 0; j < LIST_SIZE/(2*BLOCK_SIZE); j++) {
       int win_size = 2*BLOCK_SIZE - (2*BLOCK_SIZE - (LIST_SIZE - (i&1))%(2*BLOCK_SIZE))*(((j+1)*2*BLOCK_SIZE + (i&1)) > LIST_SIZE);
-      // shared_koronel<<<dimGrid, dimBlock, sizeof(int32_t)*win_size>>>((device_list_ref + 2*BLOCK_SIZE*j + (i&1)), win_size);
+      global_koronel<<<dimGrid, dimBlock>>>((device_list_ref + 2*BLOCK_SIZE*j + (i&1)), win_size);
+    }
+  }
+
+  CUDA_CALL(cudaMemcpy(list, device_list_ref, list_size*sizeof(int32_t), cudaMemcpyDeviceToHost));
+  CUDA_CALL(cudaFree(device_list_ref));
+}
+
+__host__
+void odd_even_bubble_sort_shared (int32_t * list, int32_t list_size)
+{
+  int32_t * device_list_ref;
+
+  // dim3 dimGrid ((uint)(LIST_SIZE/(2*BLOCK_SIZE)), 1, 1); //TODO: Usar ceil
+  dim3 dimGrid (1, 1, 1); //TODO: Usar ceil
+	dim3 dimBlock (BLOCK_SIZE, 1, 1);
+
+  CUDA_CALL(cudaMalloc((void **) &device_list_ref, list_size*sizeof(int32_t)));
+  CUDA_CALL(cudaMemcpy(device_list_ref, list, list_size*sizeof(int32_t), cudaMemcpyHostToDevice));
+
+  printf("Llamando al kernel con shared memory... \n");
+  for (int i = 0; i < LIST_SIZE; i++){
+    if (i%(LIST_SIZE/10)==0)
+      printf("%d/100...\n", 10*i/(LIST_SIZE/10));
+    for (int j = 0; j < LIST_SIZE/(2*BLOCK_SIZE); j++) {
+      int win_size = 2*BLOCK_SIZE - (2*BLOCK_SIZE - (LIST_SIZE - (i&1))%(2*BLOCK_SIZE))*(((j+1)*2*BLOCK_SIZE + (i&1)) > LIST_SIZE);
       shared_koronel<<<dimGrid, dimBlock>>>((device_list_ref + 2*BLOCK_SIZE*j + (i&1)), win_size);
     }
+  }
 
   CUDA_CALL(cudaMemcpy(list, device_list_ref, list_size*sizeof(int32_t), cudaMemcpyDeviceToHost));
   CUDA_CALL(cudaFree(device_list_ref));
