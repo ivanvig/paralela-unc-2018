@@ -128,6 +128,9 @@ __host__
 void odd_even_bubble_sort_global (int32_t * list, int32_t list_size)
 {
   int32_t * device_list_ref;
+  cudaEvent_t start, stop;
+  CUDA_CALL(cudaEventCreate(&start));
+  CUDA_CALL(cudaEventCreate(&stop));
 
   dim3 dimGrid ((uint)(LIST_SIZE/(2*BLOCK_SIZE)), 1, 1); //TODO: Usar ceil
   // dim3 dimGrid (1, 1, 1); //TODO: Usar ceil
@@ -137,12 +140,19 @@ void odd_even_bubble_sort_global (int32_t * list, int32_t list_size)
   CUDA_CALL(cudaMemcpy(device_list_ref, list, list_size*sizeof(int32_t), cudaMemcpyHostToDevice));
 
   printf("Llamando al kernel con global memory... \n");
+  CUDA_CALL(cudaEventRecord(start));
   for (int i = 0; i < LIST_SIZE; i++){
     if (i%(LIST_SIZE/10)==0)
       printf("%d/100...\n", 10*i/(LIST_SIZE/10));
 
     global_koronel<<<dimGrid, dimBlock>>>((device_list_ref + (i&1)), LIST_SIZE - (i&1));
   }
+  CUDA_CALL(cudaEventRecord(stop));
+  CUDA_CALL(cudaEventSynchronize(stop));
+  float milliseconds = 0;
+  CUDA_CALL(cudaEventElapsedTime(&milliseconds, start, stop));
+
+  printf("Tiempo en kernel de global (ms): %f\n", milliseconds/1000);
 
   CUDA_CALL(cudaMemcpy(list, device_list_ref, list_size*sizeof(int32_t), cudaMemcpyDeviceToHost));
   CUDA_CALL(cudaFree(device_list_ref));
@@ -152,6 +162,9 @@ __host__
 void odd_even_bubble_sort_shared (int32_t * list, int32_t list_size)
 {
   int32_t * device_list_ref;
+  cudaEvent_t start, stop;
+  CUDA_CALL(cudaEventCreate(&start));
+  CUDA_CALL(cudaEventCreate(&stop));
 
   dim3 dimGrid ((uint)(LIST_SIZE/(2*BLOCK_SIZE)), 1, 1); //TODO: Usar ceil
 	dim3 dimBlock (BLOCK_SIZE, 1, 1);
@@ -160,12 +173,19 @@ void odd_even_bubble_sort_shared (int32_t * list, int32_t list_size)
   CUDA_CALL(cudaMemcpy(device_list_ref, list, list_size*sizeof(int32_t), cudaMemcpyHostToDevice));
 
   printf("Llamando al kernel con shared memory... \n");
+  CUDA_CALL(cudaEventRecord(start));
   for (int i = 0; i < LIST_SIZE; i++){
     if (i%(LIST_SIZE/10)==0)
       printf("%d/100...\n", 10*i/(LIST_SIZE/10));
 
     shared_koronel<<<dimGrid, dimBlock>>>((device_list_ref + (i&1)), LIST_SIZE - (i&1));
   }
+  CUDA_CALL(cudaEventRecord(stop));
+  CUDA_CALL(cudaEventSynchronize(stop));
+  float milliseconds = 0;
+  CUDA_CALL(cudaEventElapsedTime(&milliseconds, start, stop));
+
+  printf("Tiempo en kernel de shared (ms): %f\n", milliseconds/1000);
 
   CUDA_CALL(cudaMemcpy(list, device_list_ref, list_size*sizeof(int32_t), cudaMemcpyDeviceToHost));
   CUDA_CALL(cudaFree(device_list_ref));
