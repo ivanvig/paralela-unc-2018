@@ -22,11 +22,13 @@ void shared_koronel(int32_t * list, int32_t list_size)
 
   int64_t pos = 2*(blockDim.x * blockIdx.x + threadIdx.x);
 
-  slist[pos] = list[pos];
-  slist[pos+1] = list[pos+1];
-  for (int64_t i = 0; i<list_size; i++){
+  int win_size = 2*blockDim.x - (2*blockDim.x - list_size%(2*blockDim.x))*(((blockIdx.x+1)*2*blockDim.x) > list_size);
+
+  slist[threadIdx.x] = list[pos];
+  slist[threadIdx.x + 1] = list[pos+1];
+  for (int64_t i = 0; i<win_size; i++){
     int64_t pos_oddeven = pos + (i&1);
-    if (pos_oddeven < list_size-1)
+    if (pos_oddeven < win_size-1)
       if(slist[pos_oddeven]>slist[pos_oddeven+1])
         SWAP(&slist[pos_oddeven], &slist[pos_oddeven+1]);
     __syncthreads();
@@ -40,9 +42,10 @@ void global_koronel(int32_t * list, int32_t list_size)
 {
   int64_t pos = 2*(blockDim.x * blockIdx.x + threadIdx.x);
 
-  for (int64_t i = 0; i<list_size; i++){
+  int win_size = 2*blockDim.x - (2*blockDim.x - list_size%(2*blockDim.x))*(((blockIdx.x+1)*2*blockDim.x) > list_size);
+  for (int64_t i = 0; i<win_size; i++){
     int64_t pos_oddeven = pos + (i&1);
-    if (pos_oddeven < list_size-1)
+    if (pos_oddeven < win_size)
       if(list[pos_oddeven]>list[pos_oddeven+1])
         SWAP(&list[pos_oddeven], &list[pos_oddeven+1]);
     __syncthreads();
@@ -126,8 +129,8 @@ void odd_even_bubble_sort_global (int32_t * list, int32_t list_size)
 {
   int32_t * device_list_ref;
 
-  // dim3 dimGrid ((uint)(LIST_SIZE/(2*BLOCK_SIZE)), 1, 1); //TODO: Usar ceil
-  dim3 dimGrid (1, 1, 1); //TODO: Usar ceil
+  dim3 dimGrid ((uint)(LIST_SIZE/(2*BLOCK_SIZE)), 1, 1); //TODO: Usar ceil
+  // dim3 dimGrid (1, 1, 1); //TODO: Usar ceil
 	dim3 dimBlock (BLOCK_SIZE, 1, 1);
 
   CUDA_CALL(cudaMalloc((void **) &device_list_ref, list_size*sizeof(int32_t)));
@@ -137,10 +140,8 @@ void odd_even_bubble_sort_global (int32_t * list, int32_t list_size)
   for (int i = 0; i < LIST_SIZE; i++){
     if (i%(LIST_SIZE/10)==0)
       printf("%d/100...\n", 10*i/(LIST_SIZE/10));
-    for (int j = 0; j < LIST_SIZE/(2*BLOCK_SIZE); j++) {
-      int win_size = 2*BLOCK_SIZE - (2*BLOCK_SIZE - (LIST_SIZE - (i&1))%(2*BLOCK_SIZE))*(((j+1)*2*BLOCK_SIZE + (i&1)) > LIST_SIZE);
-      global_koronel<<<dimGrid, dimBlock>>>((device_list_ref + 2*BLOCK_SIZE*j + (i&1)), win_size);
-    }
+
+    global_koronel<<<dimGrid, dimBlock>>>((device_list_ref + (i&1)), LIST_SIZE - (i&1));
   }
 
   CUDA_CALL(cudaMemcpy(list, device_list_ref, list_size*sizeof(int32_t), cudaMemcpyDeviceToHost));
@@ -152,8 +153,7 @@ void odd_even_bubble_sort_shared (int32_t * list, int32_t list_size)
 {
   int32_t * device_list_ref;
 
-  // dim3 dimGrid ((uint)(LIST_SIZE/(2*BLOCK_SIZE)), 1, 1); //TODO: Usar ceil
-  dim3 dimGrid (1, 1, 1); //TODO: Usar ceil
+  dim3 dimGrid ((uint)(LIST_SIZE/(2*BLOCK_SIZE)), 1, 1); //TODO: Usar ceil
 	dim3 dimBlock (BLOCK_SIZE, 1, 1);
 
   CUDA_CALL(cudaMalloc((void **) &device_list_ref, list_size*sizeof(int32_t)));
@@ -163,10 +163,8 @@ void odd_even_bubble_sort_shared (int32_t * list, int32_t list_size)
   for (int i = 0; i < LIST_SIZE; i++){
     if (i%(LIST_SIZE/10)==0)
       printf("%d/100...\n", 10*i/(LIST_SIZE/10));
-    for (int j = 0; j < LIST_SIZE/(2*BLOCK_SIZE); j++) {
-      int win_size = 2*BLOCK_SIZE - (2*BLOCK_SIZE - (LIST_SIZE - (i&1))%(2*BLOCK_SIZE))*(((j+1)*2*BLOCK_SIZE + (i&1)) > LIST_SIZE);
-      shared_koronel<<<dimGrid, dimBlock>>>((device_list_ref + 2*BLOCK_SIZE*j + (i&1)), win_size);
-    }
+
+    shared_koronel<<<dimGrid, dimBlock>>>((device_list_ref + (i&1)), LIST_SIZE - (i&1));
   }
 
   CUDA_CALL(cudaMemcpy(list, device_list_ref, list_size*sizeof(int32_t), cudaMemcpyDeviceToHost));
