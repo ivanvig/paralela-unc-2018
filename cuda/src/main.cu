@@ -19,23 +19,22 @@ __global__
 void shared_koronel(int32_t * list, int32_t list_size)
 {
   __shared__ int32_t slist[2*BLOCK_SIZE];
-
   int32_t *win = (list + 2*(blockDim.x * blockIdx.x));
-
-  int win_size = 2*blockDim.x - (2*blockDim.x - list_size%(2*blockDim.x))*(((blockIdx.x+1)*2*blockDim.x) > list_size);
+  int32_t win_size = 2*blockDim.x - (2*blockDim.x - list_size%(2*blockDim.x))*(((blockIdx.x+1)*2*blockDim.x) > list_size);
 
   if (2*threadIdx.x < win_size - 1) {
     slist[2*threadIdx.x] = win[2*threadIdx.x];
     slist[2*threadIdx.x + 1] = win[2*threadIdx.x+1];
   }
 
-  for (int64_t i = 0; i<win_size; i++){
-    int64_t pos_oddeven = 2*threadIdx.x + (i&1);
-    if (pos_oddeven < win_size-1)
+  for (int32_t i = 0; i<win_size; i++){
+    int32_t pos_oddeven = 2*threadIdx.x + (i&1);
+    if (pos_oddeven < win_size - 1)
       if(slist[pos_oddeven]>slist[pos_oddeven+1])
         SWAP(&slist[pos_oddeven], &slist[pos_oddeven+1]);
     __syncthreads();
   }
+
   if (2*threadIdx.x < win_size - 1) {
     win[2*threadIdx.x] = slist[2*threadIdx.x];
     win[2*threadIdx.x+1] = slist[2*threadIdx.x+1];
@@ -46,9 +45,9 @@ __global__
 void global_koronel(int32_t * list, int32_t list_size)
 {
   int32_t *win = (list + 2*(blockDim.x * blockIdx.x));
-  int win_size = 2*blockDim.x - (2*blockDim.x - list_size%(2*blockDim.x))*(((blockIdx.x+1)*2*blockDim.x) > list_size);
-  for (int64_t i = 0; i<win_size; i++){
-    int64_t pos_oddeven = 2*threadIdx.x + (i&1);
+  int32_t win_size = 2*blockDim.x - (2*blockDim.x - list_size%(2*blockDim.x))*(((blockIdx.x+1)*2*blockDim.x) > list_size);
+  for (int32_t i = 0; i<win_size; i++){
+    int32_t pos_oddeven = 2*threadIdx.x + (i&1);
     if (pos_oddeven < win_size - 1)
       if(win[pos_oddeven]>win[pos_oddeven+1])
         SWAP(&win[pos_oddeven], &win[pos_oddeven+1]);
@@ -68,7 +67,7 @@ int main (){
     // random_numbers_global[i] = LIST_SIZE - i;
   }
 
-  memcpy(random_numbers_shared, random_numbers_global, LIST_SIZE);
+  memcpy(random_numbers_shared, random_numbers_global, sizeof(int)*LIST_SIZE);
   int start_print = 0;
   int n_prints = 4096;
   int elem;
