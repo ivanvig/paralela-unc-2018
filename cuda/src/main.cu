@@ -20,34 +20,38 @@ void shared_koronel(int32_t * list, int32_t list_size)
 {
   __shared__ int32_t slist[2*BLOCK_SIZE];
 
-  int64_t pos = 2*(blockDim.x * blockIdx.x + threadIdx.x);
+  int32_t *win = (list + 2*(blockDim.x * blockIdx.x));
 
   int win_size = 2*blockDim.x - (2*blockDim.x - list_size%(2*blockDim.x))*(((blockIdx.x+1)*2*blockDim.x) > list_size);
 
-  slist[threadIdx.x] = list[pos];
-  slist[threadIdx.x + 1] = list[pos+1];
+  if (2*threadIdx.x < win_size - 1) {
+    slist[2*threadIdx.x] = win[2*threadIdx.x];
+    slist[2*threadIdx.x + 1] = win[2*threadIdx.x+1];
+  }
+
   for (int64_t i = 0; i<win_size; i++){
-    int64_t pos_oddeven = pos + (i&1);
+    int64_t pos_oddeven = 2*threadIdx.x + (i&1);
     if (pos_oddeven < win_size-1)
       if(slist[pos_oddeven]>slist[pos_oddeven+1])
         SWAP(&slist[pos_oddeven], &slist[pos_oddeven+1]);
     __syncthreads();
   }
-  list[pos] = slist[pos];
-  list[pos+1] = slist[pos+1];
+  if (2*threadIdx.x < win_size - 1) {
+    win[2*threadIdx.x] = slist[2*threadIdx.x];
+    win[2*threadIdx.x+1] = slist[2*threadIdx.x+1];
+  }
 }
 
 __global__
 void global_koronel(int32_t * list, int32_t list_size)
 {
-  int64_t pos = 2*(blockDim.x * blockIdx.x + threadIdx.x);
-
+  int32_t *win = (list + 2*(blockDim.x * blockIdx.x));
   int win_size = 2*blockDim.x - (2*blockDim.x - list_size%(2*blockDim.x))*(((blockIdx.x+1)*2*blockDim.x) > list_size);
   for (int64_t i = 0; i<win_size; i++){
-    int64_t pos_oddeven = pos + (i&1);
-    if (pos_oddeven < win_size)
-      if(list[pos_oddeven]>list[pos_oddeven+1])
-        SWAP(&list[pos_oddeven], &list[pos_oddeven+1]);
+    int64_t pos_oddeven = 2*threadIdx.x + (i&1);
+    if (pos_oddeven < win_size - 1)
+      if(win[pos_oddeven]>win[pos_oddeven+1])
+        SWAP(&win[pos_oddeven], &win[pos_oddeven+1]);
     __syncthreads();
   }
 }
@@ -66,7 +70,7 @@ int main (){
 
   memcpy(random_numbers_shared, random_numbers_global, LIST_SIZE);
   int start_print = 0;
-  int n_prints = 256;
+  int n_prints = 4096;
   int elem;
 
   printf("Lista antes de gpu: Elementos desde %i hasta %i \n", start_print, start_print+n_prints);
@@ -80,7 +84,7 @@ int main (){
   //*************************************
 
   printf("Odd even bubble sort con memoria global \n");
-  odd_even_bubble_sort_global(random_numbers_global, LIST_SIZE);
+  // odd_even_bubble_sort_global(random_numbers_global, LIST_SIZE);
 
   printf("Despues de gpu (global): Elementos desde %i hasta %i\n", start_print, start_print+n_prints);
   for (int i=start_print; i< start_print+n_prints; i++){
