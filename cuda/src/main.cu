@@ -1,10 +1,14 @@
 #include <stdio.h>
+#include <math.h>
 
 // #define LIST_SIZE 1610612736 //6 GB of ints
 //#define LIST_SIZE 209715200 //500 MB of ints
 // #define LIST_SIZE 1048576 // 1MB of ints
 // #define LIST_SIZE 65536
-#define LIST_SIZE 16384
+// #define LIST_SIZE 16384
+// #define LIST_SIZE 16384
+#define LIST_SIZE (8192 + 4096 + 1024)
+// #define LIST_SIZE 4096
 #define BLOCK_SIZE 1024
 #define CUDA_CALL(x) {cudaError_t cuda_error__ = (x); if (cuda_error__) printf("CUDA error: " #x " returned \"%s\"\n", cudaGetErrorString(cuda_error__));}
 
@@ -15,16 +19,65 @@ void odd_even_bubble_sort_global(int32_t * list, int32_t list_size);
 void odd_even_bubble_sort_shared(int32_t * list, int32_t list_size);
 int assert_sorted (int * list, int list_size);
 
+// __global__
+// void shared_koronel_64(int32_t * list, int32_t list_size, int8_t even)
+// {
+//   __shared__ int32_t slist[2*BLOCK_SIZE+1];
+//   int32_t *win = (list + 2*(blockDim.x * blockIdx.x));
+//   int32_t win_size;
+
+//   if (((blockIdx.x+1)*2*blockDim.x) > list_size)
+//       win_size = list_size % (2*blockDim.x);
+//   else
+//       win_size = 2*blockDim.x;
+
+//   if (2*threadIdx.x < win_size - 1) {
+//       if (even) {
+//           *((int64_t *)slist + threadIdx.x) = *((int64_t *)win + threadIdx.x);
+//       } else {
+//           if (threadIdx.x == 0){
+//               // printf("%d %d\n", even, win);
+//               slist[1] = win[0];
+//           } else {
+//               *((int64_t *)slist + threadIdx.x) = *((int64_t *)(win-1) + threadIdx.x);
+//           }
+//       }
+//   }
+
+//   for (int32_t i = 0; i<win_size; i++){
+//     int32_t pos_oddeven = 2*threadIdx.x + (i&1);
+//     if (pos_oddeven < win_size - 1)
+//       if(slist[pos_oddeven]>slist[pos_oddeven+1])
+//         SWAP(&slist[pos_oddeven], &slist[pos_oddeven+1]);
+//     __syncthreads();
+//   }
+
+//   if (2*threadIdx.x < win_size - 1) {
+//       if (even) {
+//           *((int64_t *)win + threadIdx.x) = *((int64_t *)slist + threadIdx.x);
+//       } else {
+//           if (threadIdx.x == 0){
+//               win[0] = slist[1];
+//           } else {
+//               *((int64_t *)(win-1) + threadIdx.x) = *((int64_t *)slist + threadIdx.x);
+//           }
+//       }
+//   }
+// }
+
 __global__
 void shared_koronel(int32_t * list, int32_t list_size)
 {
   __shared__ int32_t slist[2*BLOCK_SIZE];
+  // printf("soy bloque %d\n", blockIdx.x);
   int32_t *win = (list + 2*(blockDim.x * blockIdx.x));
   int32_t win_size = 2*blockDim.x - (2*blockDim.x - list_size%(2*blockDim.x))*(((blockIdx.x+1)*2*blockDim.x) > list_size);
 
   if (2*threadIdx.x < win_size - 1) {
-    slist[2*threadIdx.x] = win[2*threadIdx.x];
-    slist[2*threadIdx.x + 1] = win[2*threadIdx.x+1];
+    // slist[2*threadIdx.x] = win[2*threadIdx.x];
+    // slist[2*threadIdx.x + 1] = win[2*threadIdx.x+1];
+    slist[threadIdx.x] = win[threadIdx.x];
+    slist[threadIdx.x + blockDim.x] = win[threadIdx.x+blockDim.x];
   }
 
   for (int32_t i = 0; i<win_size; i++){
@@ -38,6 +91,8 @@ void shared_koronel(int32_t * list, int32_t list_size)
   if (2*threadIdx.x < win_size - 1) {
     win[2*threadIdx.x] = slist[2*threadIdx.x];
     win[2*threadIdx.x+1] = slist[2*threadIdx.x+1];
+    // win[threadIdx.x] = slist[threadIdx.x];
+    // win[threadIdx.x + blockDim.x] = slist[threadIdx.x+blockDim.x];
   }
 }
 
@@ -169,7 +224,17 @@ void odd_even_bubble_sort_shared (int32_t * list, int32_t list_size)
   CUDA_CALL(cudaEventCreate(&start));
   CUDA_CALL(cudaEventCreate(&stop));
 
-  dim3 dimGrid ((uint)(LIST_SIZE/(2*BLOCK_SIZE)), 1, 1); //TODO: Usar ceil
+  cudaDeviceProp prop;
+  cudaGetDeviceProperties(&prop, 0);
+  uint maxnblocks = prop.maxThreadsPerMultiProcessor/BLOCK_SIZE * prop.multiProcessorCount; //TODO: ojo flotante
+  uint blocks_needed = (uint) ceil((double)LIST_SIZE/(2*BLOCK_SIZE));
+
+  // dim3 dimGrid ((uint)(LIST_SIZE/(2*BLOCK_SIZE)), 1, 1); //TODO: Usar ceil
+  // if (LIST_SIZE/(2*BLOCK_SIZE) > maxnblocks) {
+  //     dim3 dimGrid (maxnblocks, 1, 1); //TODO: Usar ceil
+  // }else{
+  //     dim3 dimGrid ((uint)(LIST_SIZE/(2*BLOCK_SIZE)), 1, 1); //TODO: Usar ceil
+  // }
 	dim3 dimBlock (BLOCK_SIZE, 1, 1);
 
   CUDA_CALL(cudaMalloc((void **) &device_list_ref, list_size*sizeof(int32_t)));
@@ -181,7 +246,24 @@ void odd_even_bubble_sort_shared (int32_t * list, int32_t list_size)
     if (i%(LIST_SIZE/10)==0)
       printf("%d/100...\n", 10*i/(LIST_SIZE/10));
 
-    shared_koronel<<<dimGrid, dimBlock>>>((device_list_ref + (i&1)), LIST_SIZE - (i&1));
+    if (blocks_needed % maxnblocks) {
+        if (i == 0)
+            printf("adentro del if, dos: %d\n list_size:%d\n", blocks_needed%maxnblocks, LIST_SIZE - (i&1) - ((blocks_needed/maxnblocks)*maxnblocks*2*BLOCK_SIZE));
+        shared_koronel<<<(blocks_needed % maxnblocks), dimBlock>>>(
+            ((blocks_needed/maxnblocks)*maxnblocks*2*BLOCK_SIZE + device_list_ref + (i&1)), 
+            LIST_SIZE - (i&1) - ((blocks_needed/maxnblocks)*maxnblocks*2*BLOCK_SIZE)
+            );
+    }
+
+    for (int j = 0; j < blocks_needed/maxnblocks; j++) {
+        if (i == 0)
+            printf("ADENTRO DEL FOR, maxnblocks: %d, blocks_needed:%d\n", maxnblocks, blocks_needed);
+        shared_koronel<<<maxnblocks, dimBlock>>>(
+            ((j*2*BLOCK_SIZE*maxnblocks) + device_list_ref + (i&1)), 
+            LIST_SIZE - (i&1) - (j*2*BLOCK_SIZE*maxnblocks)
+            );
+    }
+    // shared_koronel_64<<<dimGrid, dimBlock>>>((device_list_ref + (i&1)), LIST_SIZE - (i&1), (~i)&1);
   }
   CUDA_CALL(cudaEventRecord(stop));
   CUDA_CALL(cudaEventSynchronize(stop));
