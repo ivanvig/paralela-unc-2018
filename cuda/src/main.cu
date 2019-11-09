@@ -232,7 +232,6 @@ void odd_even_bubble_sort_shared (int32_t * list, int32_t list_size)
 
   cudaDeviceProp prop;
   cudaGetDeviceProperties(&prop, 0);
-  uint maxnblocks = prop.maxThreadsPerMultiProcessor/BLOCK_SIZE * prop.multiProcessorCount; //TODO: ojo flotante
   uint blocks_needed = (uint) ceil((double)LIST_SIZE/(2*BLOCK_SIZE));
 
   // dim3 dimGrid ((uint)(LIST_SIZE/(2*BLOCK_SIZE)), 1, 1); //TODO: Usar ceil
@@ -241,7 +240,7 @@ void odd_even_bubble_sort_shared (int32_t * list, int32_t list_size)
   // }else{
   //     dim3 dimGrid ((uint)(LIST_SIZE/(2*BLOCK_SIZE)), 1, 1); //TODO: Usar ceil
   // }
-  dim3 dimGridMax (maxnblocks, 1, 1); //TODO: Usar ceil
+  dim3 dimGrid(blocks_needed, 1, 1); //TODO: Usar ceil
 	dim3 dimBlock (BLOCK_SIZE, 1, 1);
 
   CUDA_CALL(cudaMalloc((void **) &device_list_ref, list_size*sizeof(int32_t)));
@@ -253,32 +252,13 @@ void odd_even_bubble_sort_shared (int32_t * list, int32_t list_size)
     if (i%(LIST_SIZE/10)==0)
       printf("%d/100...\n", 10*i/(LIST_SIZE/10));
 
-    for (int j = 0; j < blocks_needed/maxnblocks; j++) {
-        if (i == 0)
-          printf(
-                 "ADENTRO DEL FOR, list_size_kernel: %d, maxnblocks: %d, blocks_needed:%d\n", 
-                 LIST_SIZE - (i&1) - (j*2*BLOCK_SIZE*maxnblocks),
-                 maxnblocks, blocks_needed
-                 );
-        shared_koronel<<<dimGridMax, dimBlock>>>
+        shared_koronel<<<dimGrid, dimBlock>>>
           (
-           ((j*2*BLOCK_SIZE*maxnblocks) + device_list_ref + (i&1)), 
-           LIST_SIZE - (i&1) - (j*2*BLOCK_SIZE*maxnblocks)
+           device_list_ref + (i&1), 
+           LIST_SIZE - (i&1)
            );
-    }
-
-    if (blocks_needed % maxnblocks) {
-        if (i == 0)
-            printf("adentro del if, dos: %d\n list_size:%d\n", blocks_needed%maxnblocks, LIST_SIZE - (i&1) - ((blocks_needed/maxnblocks)*maxnblocks*2*BLOCK_SIZE));
-        dim3 dimGridMod (blocks_needed % maxnblocks, 1, 1); //TODO: Usar ceil
-        shared_koronel<<<dimGridMod, dimBlock>>>(
-            ((blocks_needed/maxnblocks)*maxnblocks*2*BLOCK_SIZE + device_list_ref + (i&1)), 
-            LIST_SIZE - (i&1) - ((blocks_needed/maxnblocks)*maxnblocks*2*BLOCK_SIZE)
-            );
-    }
-
-    // shared_koronel_64<<<dimGrid, dimBlock>>>((device_list_ref + (i&1)), LIST_SIZE - (i&1), (~i)&1);
   }
+
   CUDA_CALL(cudaEventRecord(stop));
   CUDA_CALL(cudaEventSynchronize(stop));
   float milliseconds = 0;
