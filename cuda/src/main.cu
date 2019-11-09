@@ -1,14 +1,16 @@
 #include <stdio.h>
 #include <math.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 // #define LIST_SIZE 1610612736 //6 GB of ints
 //#define LIST_SIZE 209715200 //500 MB of ints
 // #define LIST_SIZE 1048576 // 1MB of ints
 // #define LIST_SIZE 65536
 // #define LIST_SIZE 16384
-#define LIST_SIZE (16384 + 8192)
+// #define LIST_SIZE (16384 + 8192)
 // #define LIST_SIZE (8192 + 4096 + 2048)
-// #define LIST_SIZE (8192 + 4096 + 1024)
+#define LIST_SIZE (8192 + 4096)
 // #define LIST_SIZE (3*(8192 + 4096))
 // #define LIST_SIZE 8192
 // #define LIST_SIZE 4096
@@ -21,6 +23,7 @@ inline void SWAP(int32_t *_a,int32_t *_b){int32_t __aux; __aux = *_a; *_a = *_b;
 void odd_even_bubble_sort_global(int32_t * list, int32_t list_size);
 void odd_even_bubble_sort_shared(int32_t * list, int32_t list_size);
 int assert_sorted (int * list, int list_size);
+int list_to_file(const char *fname, int *buffer, size_t size);
 
 // __global__
 // void shared_koronel_64(int32_t * list, int32_t list_size, int8_t even)
@@ -126,6 +129,7 @@ int main (){
     // random_numbers_global[i] = rand()%20;
     random_numbers_global[i] = LIST_SIZE - i;
   }
+  list_to_file("sin_ordenar", random_numbers_global, sizeof(int)*LIST_SIZE);
 
   memcpy(random_numbers_shared, random_numbers_global, sizeof(int)*LIST_SIZE);
   int start_print = 0;
@@ -185,6 +189,7 @@ int main (){
   } else
     printf("LISTA CON SHARED MEM BIEN ORDENADA \n");
 
+  list_to_file("ordenada", random_numbers_shared, sizeof(int)*LIST_SIZE);
   return 0;
 }
 
@@ -277,5 +282,12 @@ int assert_sorted (int * list, int list_size)
     if (list[i] > list[i+1])
       return i+1;
   }
+  return 0;
+}
+
+int list_to_file(const char *fname, int *buffer, size_t size)
+{
+  int fd = open(fname, O_WRONLY | O_CREAT);
+  write(fd, buffer, size);
   return 0;
 }
