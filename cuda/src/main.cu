@@ -6,8 +6,11 @@
 // #define LIST_SIZE 1048576 // 1MB of ints
 // #define LIST_SIZE 65536
 // #define LIST_SIZE 16384
-// #define LIST_SIZE 16384
-#define LIST_SIZE (8192 + 4096 + 1024)
+#define LIST_SIZE (16384 + 8192)
+// #define LIST_SIZE (8192 + 4096 + 2048)
+// #define LIST_SIZE (8192 + 4096 + 1024)
+// #define LIST_SIZE (3*(8192 + 4096))
+// #define LIST_SIZE 8192
 // #define LIST_SIZE 4096
 #define BLOCK_SIZE 1024
 #define CUDA_CALL(x) {cudaError_t cuda_error__ = (x); if (cuda_error__) printf("CUDA error: " #x " returned \"%s\"\n", cudaGetErrorString(cuda_error__));}
@@ -68,16 +71,18 @@ int assert_sorted (int * list, int list_size);
 __global__
 void shared_koronel(int32_t * list, int32_t list_size)
 {
+  // if (threadIdx.x == 0 && list_size < 10000) {
+  //   printf("Primer elemento: %d\n", *list);
+  // }
   __shared__ int32_t slist[2*BLOCK_SIZE];
-  // printf("soy bloque %d\n", blockIdx.x);
   int32_t *win = (list + 2*(blockDim.x * blockIdx.x));
   int32_t win_size = 2*blockDim.x - (2*blockDim.x - list_size%(2*blockDim.x))*(((blockIdx.x+1)*2*blockDim.x) > list_size);
 
   if (2*threadIdx.x < win_size - 1) {
-    // slist[2*threadIdx.x] = win[2*threadIdx.x];
-    // slist[2*threadIdx.x + 1] = win[2*threadIdx.x+1];
-    slist[threadIdx.x] = win[threadIdx.x];
-    slist[threadIdx.x + blockDim.x] = win[threadIdx.x+blockDim.x];
+    slist[2*threadIdx.x] = win[2*threadIdx.x];
+    slist[2*threadIdx.x + 1] = win[2*threadIdx.x+1];
+    // slist[threadIdx.x] = win[threadIdx.x];
+    // slist[threadIdx.x + blockDim.x] = win[threadIdx.x+blockDim.x];
   }
 
   for (int32_t i = 0; i<win_size; i++){
@@ -118,13 +123,14 @@ int main (){
 
   printf("Generando lista aleatoria de %i elementos\n", LIST_SIZE);
   for (int i = 0; i<LIST_SIZE; i++){
-    random_numbers_global[i] = rand()%20;
-    // random_numbers_global[i] = LIST_SIZE - i;
+    // random_numbers_global[i] = rand()%20;
+    random_numbers_global[i] = LIST_SIZE - i;
   }
 
   memcpy(random_numbers_shared, random_numbers_global, sizeof(int)*LIST_SIZE);
   int start_print = 0;
-  int n_prints = 4096;
+  // int n_prints = 4096;
+  int n_prints = LIST_SIZE;
   int elem;
 
   printf("Lista antes de gpu: Elementos desde %i hasta %i \n", start_print, start_print+n_prints);
@@ -235,6 +241,7 @@ void odd_even_bubble_sort_shared (int32_t * list, int32_t list_size)
   // }else{
   //     dim3 dimGrid ((uint)(LIST_SIZE/(2*BLOCK_SIZE)), 1, 1); //TODO: Usar ceil
   // }
+  dim3 dimGridMax (maxnblocks, 1, 1); //TODO: Usar ceil
 	dim3 dimBlock (BLOCK_SIZE, 1, 1);
 
   CUDA_CALL(cudaMalloc((void **) &device_list_ref, list_size*sizeof(int32_t)));
@@ -246,23 +253,30 @@ void odd_even_bubble_sort_shared (int32_t * list, int32_t list_size)
     if (i%(LIST_SIZE/10)==0)
       printf("%d/100...\n", 10*i/(LIST_SIZE/10));
 
+    for (int j = 0; j < blocks_needed/maxnblocks; j++) {
+        if (i == 0)
+          printf(
+                 "ADENTRO DEL FOR, list_size_kernel: %d, maxnblocks: %d, blocks_needed:%d\n", 
+                 LIST_SIZE - (i&1) - (j*2*BLOCK_SIZE*maxnblocks),
+                 maxnblocks, blocks_needed
+                 );
+        shared_koronel<<<dimGridMax, dimBlock>>>
+          (
+           ((j*2*BLOCK_SIZE*maxnblocks) + device_list_ref + (i&1)), 
+           LIST_SIZE - (i&1) - (j*2*BLOCK_SIZE*maxnblocks)
+           );
+    }
+
     if (blocks_needed % maxnblocks) {
         if (i == 0)
             printf("adentro del if, dos: %d\n list_size:%d\n", blocks_needed%maxnblocks, LIST_SIZE - (i&1) - ((blocks_needed/maxnblocks)*maxnblocks*2*BLOCK_SIZE));
-        shared_koronel<<<(blocks_needed % maxnblocks), dimBlock>>>(
+        dim3 dimGridMod (blocks_needed % maxnblocks, 1, 1); //TODO: Usar ceil
+        shared_koronel<<<dimGridMod, dimBlock>>>(
             ((blocks_needed/maxnblocks)*maxnblocks*2*BLOCK_SIZE + device_list_ref + (i&1)), 
             LIST_SIZE - (i&1) - ((blocks_needed/maxnblocks)*maxnblocks*2*BLOCK_SIZE)
             );
     }
 
-    for (int j = 0; j < blocks_needed/maxnblocks; j++) {
-        if (i == 0)
-            printf("ADENTRO DEL FOR, maxnblocks: %d, blocks_needed:%d\n", maxnblocks, blocks_needed);
-        shared_koronel<<<maxnblocks, dimBlock>>>(
-            ((j*2*BLOCK_SIZE*maxnblocks) + device_list_ref + (i&1)), 
-            LIST_SIZE - (i&1) - (j*2*BLOCK_SIZE*maxnblocks)
-            );
-    }
     // shared_koronel_64<<<dimGrid, dimBlock>>>((device_list_ref + (i&1)), LIST_SIZE - (i&1), (~i)&1);
   }
   CUDA_CALL(cudaEventRecord(stop));

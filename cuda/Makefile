@@ -1,16 +1,23 @@
 CC=nvcc #-Xcompiler
 CFLAGS= #"-Werror, -Wall, -pedantic"
+BUILDPATH=build
 
-all: dir build/main
+
+all: dir $(BUILDPATH)/main
 
 dir:
-	mkdir -p build
+	mkdir -p $(BUILDPATH)
 
-build/main: build/main.o
-	$(CC) $(CFLAGS) build/main.o -o build/main
+debug: CFLAGS += -g -G
+debug: BUILDPATH=debug
+debug: all
 
-build/main.o: src/main.cu
-	$(CC) $(CFLAGS) -c src/main.cu -o build/main.o
+$(BUILDPATH)/main: $(BUILDPATH)/main.o
+	$(CC) $(CFLAGS) $(BUILDPATH)/main.o -o $(BUILDPATH)/main
+
+$(BUILDPATH)/main.o: src/main.cu
+	$(CC) $(CFLAGS) -c src/main.cu -o $(BUILDPATH)/main.o
 
 clean:
-	rm -r build
+	rm -rf build
+	rm -rf debug
