@@ -294,7 +294,7 @@ int assert_sorted (int8_t * list, int list_size)
 
 int list_to_file(const char *fname, int8_t *buffer, size_t size)
 {
-  int fd = open(fname, O_WRONLY | O_CREAT);
+  int fd = open(fname, O_WRONLY | O_CREAT | O_TRUNC, S_IRWXU);
   write(fd, buffer, size);
   return 0;
 }
