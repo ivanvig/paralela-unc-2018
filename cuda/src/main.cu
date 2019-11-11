@@ -6,9 +6,10 @@
 // #define LIST_SIZE 1610612736 //6 GB of ints
 //#define LIST_SIZE 209715200 //500 MB of ints
 // #define LIST_SIZE 1048576 // 1MB of ints
+#define LIST_SIZE (2 * 65536)
 // #define LIST_SIZE 65536
 // #define LIST_SIZE 49152
-#define LIST_SIZE 49152
+// #define LIST_SIZE 49152
 // #define LIST_SIZE 16384
 // #define LIST_SIZE (16384 + 8192)
 // #define LIST_SIZE (8192 + 4096 + 2048)
@@ -216,7 +217,11 @@ void odd_even_bubble_sort_global (int8_t * list, int32_t list_size)
     if (i%(LIST_SIZE/10)==0)
       printf("%d/100...\n", 10*i/(LIST_SIZE/10));
 
-    global_koronel<<<dimGrid, dimBlock>>>((device_list_ref + (i&1)), LIST_SIZE - (i&1));
+    global_koronel<<<dimGrid, dimBlock>>>
+      (
+       device_list_ref + (i&1), 
+       ((LIST_SIZE - (i&1)) >> 1) << 1
+       );
   }
   CUDA_CALL(cudaEventRecord(stop));
   CUDA_CALL(cudaEventSynchronize(stop));
@@ -259,11 +264,11 @@ void odd_even_bubble_sort_shared (int8_t * list, int32_t list_size)
     if (i%(LIST_SIZE/10)==0)
       printf("%d/100...\n", 10*i/(LIST_SIZE/10));
 
-        shared_koronel<<<dimGrid, dimBlock>>>
-          (
-           device_list_ref + (i&1),
-           LIST_SIZE - (i&1)
-           );
+    shared_koronel<<<dimGrid, dimBlock>>>
+      (
+       device_list_ref + (i&1),
+       ((LIST_SIZE - (i&1)) >> 1) << 1
+       );
   }
 
   CUDA_CALL(cudaEventRecord(stop));
