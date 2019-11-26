@@ -14,6 +14,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include<string.h>
+
 /* #define MAX_DIM 2000 */
 #define MAX_DIM 8
 #define PROCS 4
@@ -23,7 +25,7 @@ void print_array(int dim, int c[dim][dim]);
 
 int main (int argc, char *argv[])
 {
-    int rank, numtasks, sum = 0; //tag = 1;
+    int rank, numtasks; //tag = 1;
     int a[MAX_DIM][MAX_DIM];
     int b[MAX_DIM][MAX_DIM];
     int c[MAX_DIM][MAX_DIM];
@@ -46,16 +48,16 @@ int main (int argc, char *argv[])
     /*     print_array(MAX_DIM, b); */
     /* } */
 
-    //TODO: deberia andar esta declaracion de los arreglos????
+    //TODO: deberia andar esta declaracion de los arreglos???? Parece que a partir de C99 si
     int partial_size = MAX_DIM/numtasks;
     int aa[partial_size][partial_size], bb[partial_size][partial_size], cc[partial_size][partial_size];
-    int dd[partial_size][partial_size]; // TODO: solo test, borrar
+    int dd[partial_size][partial_size]; // TODO: solo test, borrar, o no?
 
     MPI_Datatype subarray, col_subarray, row_subarray;
     int sizes[2]    = {MAX_DIM, MAX_DIM};  /* size of global array */
     int subsizes[2] = {partial_size, partial_size};  /* size of sub-region */
     int starts[2]   = {0,0};  /* let's say we're looking at region "0",
-                                 which begins at index [0,0] */
+                                 which begins at index [0,0] */ //esos no son tus comentarios ivan, no seas ladron
 
     MPI_Type_create_subarray(2, sizes, subsizes, starts, MPI_ORDER_C, MPI_INT, &subarray);
     MPI_Type_create_resized(subarray, 0, partial_size*sizeof(int), &row_subarray);
@@ -64,43 +66,61 @@ int main (int argc, char *argv[])
     MPI_Type_create_resized(subarray, 0, MAX_DIM*partial_size*sizeof(int), &col_subarray);
     MPI_Type_commit(&col_subarray);
 
-    MPI_Scatter(a, 1, row_subarray, aa, partial_size * partial_size, MPI_INT, 0,MPI_COMM_WORLD);
+    for (int row = 0; row < numtasks; row++) {
+        MPI_Scatter(a + partial_size*row, 1, row_subarray, aa, partial_size * partial_size, MPI_INT, 0,MPI_COMM_WORLD);
+        for (int col = 0; col < numtasks; col++) {
 
-    //TODO: se podra definir un formato de recepcion tal que quede en memoria quede la matriz transpuesta?
-    MPI_Scatter(b, 1, col_subarray, bb, partial_size * partial_size, MPI_INT, 0,MPI_COMM_WORLD);
+            if (rank == 0)
+                printf("\n *********** ROW: %d | COL: %d ***************\n", row, col);
+
+            //TODO: se podra definir un formato de recepcion tal que quede en memoria quede la matriz transpuesta?
+            MPI_Scatter(*b + partial_size*col, 1, col_subarray, bb, partial_size * partial_size, MPI_INT, 0,MPI_COMM_WORLD);
 
 
-    //TODO: Optimizar esto
-    for (int i = 0; i < partial_size; i++) {
-        for (int j = 0; j < partial_size; j++) {
-            cc[i][j] = 0;
-            for (int k = 0; k < partial_size; k++){
-                cc[i][j] += aa[i][k] * bb[k][j];
+            //TODO: Optimizar esto
+            for (int i = 0; i < partial_size; i++) {
+                for (int j = 0; j < partial_size; j++) {
+                    cc[i][j] = 0;
+                    for (int k = 0; k < partial_size; k++){
+                        cc[i][j] += aa[i][k] * bb[k][j];
+                    }
+                }
+            }
+
+            for (int i = 0; i < numtasks; i++){
+                MPI_Barrier(MPI_COMM_WORLD);
+                if (rank == i) {
+                    printf("\nRANK: %d\n", rank);
+                    printf("aa: \n");
+                    print_array(partial_size, aa);
+                    printf("bb: \n");
+                    print_array(partial_size, bb);
+                    printf("cc: \n");
+                    print_array(partial_size, cc);
+                }
+            }
+
+
+
+            //TODO: mejor forma de hacer esto?
+            MPI_Reduce(cc, dd, partial_size*partial_size, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+            for (int i = 0; i < partial_size; i++) {
+                memcpy(&c[row*partial_size + i][col*partial_size], dd[i], sizeof(int)*partial_size);
+            }
+
+            if (rank == 0){
+                printf("\n RESULTADO PARCIAL\n");
+                print_array(partial_size, dd);
             }
         }
     }
 
-    for (int i = 0; i < numtasks; i++){
-        MPI_Barrier(MPI_COMM_WORLD);
-        if (rank == i) {
-            printf("\nRANK: %d\n", rank);
-            printf("aa: \n");
-            print_array(partial_size, aa);
-            printf("bb: \n");
-            print_array(partial_size, bb);
-            printf("cc: \n");
-            print_array(partial_size, cc);
-        }
-    }
-
-
-    for (int i = 0; i < partial_size; i++) {
-        MPI_Reduce(cc + i, dd + i, partial_size, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
-    }
+    MPI_Type_free(&col_subarray);
+    MPI_Type_free(&row_subarray);
 
     if (rank == 0){
-        printf("\n RESULTADO\n");
-        print_array(partial_size, dd);
+        printf("\n RESULTADO FINAL\n");
+        print_array(MAX_DIM, c);
     }
 
     MPI_Finalize();
@@ -111,7 +131,7 @@ void print_array(int dim, int c[dim][dim])
 {
     for (int i = 0; i < dim; i++) {
         for (int j = 0; j < dim; j++) {
-            printf(" %d", c[i][j]);
+            printf(" %6d", c[i][j]);
         }
         printf ("\n");
     }
