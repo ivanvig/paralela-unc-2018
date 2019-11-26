@@ -15,10 +15,11 @@
 #include <stdlib.h>
 
 /* #define MAX_DIM 2000 */
-#define MAX_DIM 4
+#define MAX_DIM 8
 #define PROCS 4
 
-void print_array(int c[MAX_DIM][MAX_DIM]);
+
+void print_array(int dim, int c[dim][dim]);
 
 int main (int argc, char *argv[])
 {
@@ -29,54 +30,70 @@ int main (int argc, char *argv[])
 
     for (int i = 0; i< MAX_DIM; i++){
         for (int j = 0; j< MAX_DIM; j++){
-            a[i][j] = 1;
-            b[i][j] = 1;
+            a[i][j] = i*MAX_DIM + j;
+            b[i][j] = i*MAX_DIM + j;
         }
     }
 
 
-    int aa[MAX_DIM], cc[MAX_DIM];
 
     MPI_Init(&argc,&argv);
     MPI_Comm_size(MPI_COMM_WORLD,&numtasks);
     MPI_Comm_rank(MPI_COMM_WORLD,&rank);
 
     if (rank == 0){
-        print_array(a);
-        print_array(b);
+        print_array(MAX_DIM, a);
+        print_array(MAX_DIM, b);
     }
 
-    MPI_Scatter(a, MAX_DIM*MAX_DIM/numtasks, MPI_INT, aa, MAX_DIM*MAX_DIM/numtasks, MPI_INT,0,MPI_COMM_WORLD);
+    int aa[MAX_DIM/numtasks][MAX_DIM/numtasks], bb[MAX_DIM/numtasks], cc[MAX_DIM/numtasks];
+    for (int i = 0; i < MAX_DIM/numtasks; i++){
+        MPI_Scatter(a + i, MAX_DIM/numtasks, MPI_INT, aa + i, MAX_DIM/numtasks, MPI_INT, 0,MPI_COMM_WORLD);
+    }
 
-    //No es necesario, todos tienen una copia
-    /* MPI_Bcast(b, MAX_DIM*MAX_DIM, MPI_INT, 0, MPI_COMM_WORLD); */
+    if (rank == 1){
+        print_array(MAX_DIM/numtasks, aa);
+        /* print_array(b); */
+    }
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    /* //No es necesario, todos tienen una copia */
+    /* /\* MPI_Bcast(b, MAX_DIM*MAX_DIM, MPI_INT, 0, MPI_COMM_WORLD); *\/ */
 
-    for (int i = 0; i < MAX_DIM; i++)
-        {
-            for (int j = 0; j < MAX_DIM; j++)
-                {
-                    sum = sum + aa[j] * b[j][i];
-                }
-            cc[i] = sum;
-            sum = 0;
-            }
+    /* MPI_Barrier(MPI_COMM_WORLD); */
 
-    MPI_Gather(cc, MAX_DIM*MAX_DIM/numtasks, MPI_INT, c, MAX_DIM*MAX_DIM/numtasks, MPI_INT, 0, MPI_COMM_WORLD);
-    MPI_Barrier(MPI_COMM_WORLD);
+    /* for (int i = 0; i < MAX_DIM; i++) */
+    /*     { */
+    /*         for (int j = 0; j < MAX_DIM; j++) */
+    /*             { */
+    /*                 sum = sum + aa[j] * b[j][i]; */
+    /*             } */
+    /*         cc[i] = sum; */
+    /*         sum = 0; */
+    /*         } */
 
-    if (rank == 0)
-        print_array(c);
+    /* MPI_Gather(cc, MAX_DIM*MAX_DIM/numtasks, MPI_INT, c, MAX_DIM*MAX_DIM/numtasks, MPI_INT, 0, MPI_COMM_WORLD); */
+    /* MPI_Barrier(MPI_COMM_WORLD); */
+
+    /* if (rank == 0) */
+    /*     print_array(c); */
 
     MPI_Finalize();
 }
 
 
-void print_array(int c[MAX_DIM][MAX_DIM])
+/* void print_array(int c[MAX_DIM][MAX_DIM]) */
+/* { */
+/*     for (int i = 0; i < MAX_DIM; i++) { */
+/*         for (int j = 0; j < MAX_DIM; j++) { */
+/*             printf(" %d", c[i][j]); */
+/*         } */
+/*         printf ("\n"); */
+/*     } */
+/* } */
+void print_array(int dim, int c[dim][dim])
 {
-    for (int i = 0; i < MAX_DIM; i++) {
-        for (int j = 0; j < MAX_DIM; j++) {
+    for (int i = 0; i < dim; i++) {
+        for (int j = 0; j < dim; j++) {
             printf(" %d", c[i][j]);
         }
         printf ("\n");
