@@ -13,6 +13,7 @@
 #include "mpi.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <omp.h>
 
 #include<string.h>
 
@@ -83,8 +84,9 @@ int main (int argc, char *argv[])
             MPI_Scatter(*b + partial_size*col, 1, col_subarray, bb, partial_size * partial_size, MPI_INT, 0,MPI_COMM_WORLD);
 
             //TODO: Optimizar esto
-            for (int i = 0; i < partial_size; i++) {
-                for (int j = 0; j < partial_size; j++) {
+#pragma omp parallel for
+            for (int j = 0; j < partial_size; j++) {
+                for (int i = 0; i < partial_size; i++) {
                     cc[i][j] = 0;
                     for (int k = 0; k < partial_size; k++){
                         cc[i][j] += aa[i][k] * bb[k][j];
@@ -109,10 +111,11 @@ int main (int argc, char *argv[])
 
             //TODO: mejor forma de hacer esto?
             MPI_Reduce(cc, dd, partial_size*partial_size, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
-            for (int i = 0; i < partial_size; i++) {
-                memcpy(&c[row*partial_size + i][col*partial_size], dd[i], sizeof(int)*partial_size);
+            if (rank == 0){
+                for (int i = 0; i < partial_size; i++) {
+                    memcpy(&c[row*partial_size + i][col*partial_size], dd[i], sizeof(int)*partial_size);
+                }
             }
-
             /* if (rank == 0){ */
             /*     printf("\n RESULTADO PARCIAL\n"); */
             /*     print_array(partial_size, dd); */

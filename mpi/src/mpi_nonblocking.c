@@ -13,6 +13,7 @@
 #include "mpi.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <omp.h>
 
 #include<string.h>
 
@@ -46,6 +47,8 @@ int main (int argc, char *argv[])
     MPI_Comm_size(MPI_COMM_WORLD,&numtasks);
     MPI_Comm_rank(MPI_COMM_WORLD,&rank);
 
+    MPI_Request req;
+    /* MPI_Status stats[numtasks]; */
     /* if (rank == 0){ */
     /*     print_array(MAX_DIM, a); */
     /*     print_array(MAX_DIM, b); */
@@ -74,49 +77,83 @@ int main (int argc, char *argv[])
 
     for (int row = 0; row < numtasks; row++) {
         MPI_Scatter(a + partial_size*row, 1, row_subarray, aa, partial_size * partial_size, MPI_INT, 0,MPI_COMM_WORLD);
-        for (int col = 0; col < numtasks; col++) {
 
-            /* if (rank == 0) */
-            /*     printf("\n *********** ROW: %d | COL: %d ***************\n", row, col); */
-
-            //TODO: se podra definir un formato de recepcion tal que quede en memoria quede la matriz transpuesta?
-            MPI_Scatter(*b + partial_size*col, 1, col_subarray, bb, partial_size * partial_size, MPI_INT, 0,MPI_COMM_WORLD);
-
-            //TODO: Optimizar esto
+        //------------- BLOQUE 1 -------------//
+        MPI_Scatter(*b + partial_size*0, 1, col_subarray, bb, partial_size * partial_size, MPI_INT, 0,MPI_COMM_WORLD);
+        #pragma omp parallel for
+        for (int j = 0; j < partial_size; j++) {
             for (int i = 0; i < partial_size; i++) {
-                for (int j = 0; j < partial_size; j++) {
-                    cc[i][j] = 0;
-                    for (int k = 0; k < partial_size; k++){
-                        cc[i][j] += aa[i][k] * bb[k][j];
-                    }
+                cc[i][j] = 0;
+                for (int k = 0; k < partial_size; k++){
+                    cc[i][j] += aa[i][k] * bb[k][j];
                 }
             }
+        }
+        //Ireduce 1
+        MPI_Ireduce(cc, dd, partial_size*partial_size, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD, &req);
 
-            /* for (int i = 0; i < numtasks; i++){ */
-            /*     MPI_Barrier(MPI_COMM_WORLD); */
-            /*     if (rank == i) { */
-            /*         printf("\nRANK: %d\n", rank); */
-            /*         printf("aa: \n"); */
-            /*         print_array(partial_size, aa); */
-            /*         printf("bb: \n"); */
-            /*         print_array(partial_size, bb); */
-            /*         printf("cc: \n"); */
-            /*         print_array(partial_size, cc); */
-            /*     } */
-            /* } */
-
-
-
-            //TODO: mejor forma de hacer esto?
-            MPI_Reduce(cc, dd, partial_size*partial_size, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+        //------------- BLOQUE 2 -------------//
+        MPI_Scatter(*b + partial_size*1, 1, col_subarray, bb, partial_size * partial_size, MPI_INT, 0,MPI_COMM_WORLD);
+        MPI_Wait(&req, 0);
+        if (rank == 0){
             for (int i = 0; i < partial_size; i++) {
-                memcpy(&c[row*partial_size + i][col*partial_size], dd[i], sizeof(int)*partial_size);
+                memcpy(&c[row*partial_size + i][0], dd[i], sizeof(int)*partial_size);
             }
+        }
+        #pragma omp parallel for
+        for (int j = 0; j < partial_size; j++) {
+            for (int i = 0; i < partial_size; i++) {
+                cc[i][j] = 0;
+                for (int k = 0; k < partial_size; k++){
+                    cc[i][j] += aa[i][k] * bb[k][j];
+                }
+            }
+        }
+        MPI_Ireduce(cc, dd, partial_size*partial_size, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD, &req);
 
-            /* if (rank == 0){ */
-            /*     printf("\n RESULTADO PARCIAL\n"); */
-            /*     print_array(partial_size, dd); */
-            /* } */
+
+        //------------- BLOQUE 3 -------------//
+        MPI_Scatter(*b + partial_size*2, 1, col_subarray, bb, partial_size * partial_size, MPI_INT, 0,MPI_COMM_WORLD);
+        MPI_Wait(&req, 0);
+        if (rank == 0){
+            for (int i = 0; i < partial_size; i++) {
+                memcpy(&c[row*partial_size + i][1], dd[i], sizeof(int)*partial_size);
+            }
+        }
+        #pragma omp parallel for
+        for (int j = 0; j < partial_size; j++) {
+            for (int i = 0; i < partial_size; i++) {
+                cc[i][j] = 0;
+                for (int k = 0; k < partial_size; k++){
+                    cc[i][j] += aa[i][k] * bb[k][j];
+                }
+            }
+        }
+        MPI_Ireduce(cc, dd, partial_size*partial_size, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD, &req);
+
+        //------------- BLOQUE 4 -------------//
+        MPI_Scatter(*b + partial_size*3, 1, col_subarray, bb, partial_size * partial_size, MPI_INT, 0,MPI_COMM_WORLD);
+        MPI_Wait(&req, 0);
+        if (rank == 0){
+            for (int i = 0; i < partial_size; i++) {
+                memcpy(&c[row*partial_size + i][2], dd[i], sizeof(int)*partial_size);
+            }
+        }
+        #pragma omp parallel for
+        for (int j = 0; j < partial_size; j++) {
+            for (int i = 0; i < partial_size; i++) {
+                cc[i][j] = 0;
+                for (int k = 0; k < partial_size; k++){
+                    cc[i][j] += aa[i][k] * bb[k][j];
+                }
+            }
+        }
+        MPI_Ireduce(cc, dd, partial_size*partial_size, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD, &req);
+
+        if (rank == 0){
+            for (int i = 0; i < partial_size; i++) {
+                memcpy(&c[row*partial_size + i][3], dd[i], sizeof(int)*partial_size);
+            }
         }
     }
 

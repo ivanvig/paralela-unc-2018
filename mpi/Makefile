@@ -1,5 +1,5 @@
 CC=mpicc
-CFLAGS= -Wall -Werror -pedantic
+CFLAGS= -Wall -Werror -pedantic -fopenmp
 
 all: dir build/mpi_blocking build/mpi_nonblocking
 
