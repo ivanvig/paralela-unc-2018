@@ -23,6 +23,7 @@
 
 
 void print_array(int dim, int c[dim][dim]);
+void matmul(int dim, int aa[dim][dim], int bb[dim][dim], int cc[dim][dim]);
 
 int main (int argc, char *argv[])
 {
@@ -47,7 +48,7 @@ int main (int argc, char *argv[])
     MPI_Comm_size(MPI_COMM_WORLD,&numtasks);
     MPI_Comm_rank(MPI_COMM_WORLD,&rank);
 
-    MPI_Request req;
+    MPI_Request req_a[numtasks], req_b[numtasks];
     /* MPI_Status stats[numtasks]; */
     /* if (rank == 0){ */
     /*     print_array(MAX_DIM, a); */
@@ -56,6 +57,7 @@ int main (int argc, char *argv[])
 
     //TODO: deberia andar esta declaracion de los arreglos???? Parece que a partir de C99 si
     int partial_size = MAX_DIM/numtasks;
+    int aa_aux[MAX_DIM][partial_size], bb_aux[MAX_DIM][partial_size], cc_aux[MAX_DIM][MAX_DIM];
     int aa[partial_size][partial_size], bb[partial_size][partial_size], cc[partial_size][partial_size];
     int dd[partial_size][partial_size]; // TODO: solo test, borrar, o no?
 
@@ -74,6 +76,28 @@ int main (int argc, char *argv[])
 
     MPI_Barrier(MPI_COMM_WORLD);
     start = MPI_Wtime();
+
+    for (int i = 0; i < numtasks; i++) {
+        //TODO: usar in place
+        MPI_Iscatter(a + partial_size*i, 1, row_subarray, aa_aux + i*partial_size*partial_size, partial_size * partial_size, MPI_INT, 0,MPI_COMM_WORLD, &req_a[i]);
+        MPI_Iscatter(*b + partial_size*i, 1, col_subarray, bb_aux + i*partial_size*partial_size, partial_size * partial_size, MPI_INT, 0,MPI_COMM_WORLD, &req_b[i]);
+    }
+
+
+    for (int row = 0; row < numtasks; row++) {
+        MPI_Wait(&req_a[row], 0);
+        for (int col = 0; col < numtasks; col++) {
+            //TODO: haciendo wait mas veces de las necesarias
+            MPI_Wait(&req_b[col], 0);
+            matmul(
+                partial_size,
+                aa_aux + row*partial_size*partial_size,
+                bb_aux + col*partial_size*partial_size,
+                cc_aux + row*numtasks*partial_size*partial_size + col*partial_size*partial_size
+                );
+            
+        }
+    }
 
     for (int row = 0; row < numtasks; row++) {
         MPI_Scatter(a + partial_size*row, 1, row_subarray, aa, partial_size * partial_size, MPI_INT, 0,MPI_COMM_WORLD);
@@ -181,5 +205,18 @@ void print_array(int dim, int c[dim][dim])
             printf(" %6d", c[i][j]);
         }
         printf ("\n");
+    }
+}
+
+void matmul(int dim, int aa[dim][dim], int bb[dim][dim], int cc[dim][dim])
+{
+#pragma omp parallel for
+    for (int j = 0; j < partial_size; j++) {
+        for (int i = 0; i < partial_size; i++) {
+            cc[i][j] = 0;
+            for (int k = 0; k < partial_size; k++){
+                cc[i][j] += aa[i][k] * bb[k][j];
+            }
+        }
     }
 }
