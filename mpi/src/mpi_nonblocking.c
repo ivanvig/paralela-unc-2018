@@ -17,13 +17,14 @@
 
 #include<string.h>
 
-/* #define MAX_DIM 2000 */
-#define MAX_DIM 8
+#define MAX_DIM 2000
+/* #define MAX_DIM 8 */
 #define PROCS 4
 
 
 void print_array(int dim, int c[dim][dim]);
 void matmul(int dim, int aa[dim][dim], int bb[dim][dim], int max_dim, int cc[max_dim][max_dim]);
+void print_array_v2(int dim1, int dim2, int c[dim1][dim2]);
 
 int main (int argc, char *argv[])
 {
@@ -35,10 +36,10 @@ int main (int argc, char *argv[])
 
     for (int i = 0; i< MAX_DIM; i++){
         for (int j = 0; j< MAX_DIM; j++){
-            /* a[i][j] = i*MAX_DIM + j; */
-            /* b[i][j] = i*MAX_DIM + j; */
-            a[i][j] = 1;
-            b[i][j] = 1;
+            a[i][j] = i*MAX_DIM + j;
+            b[i][j] = i*MAX_DIM + j;
+            /* a[i][j] = 1; */
+            /* b[i][j] = 1; */
         }
     }
 
@@ -48,8 +49,8 @@ int main (int argc, char *argv[])
     MPI_Comm_size(MPI_COMM_WORLD,&numtasks);
     MPI_Comm_rank(MPI_COMM_WORLD,&rank);
 
-    /* MPI_Request req[numtasks], req_a[numtasks], req_b[numtasks]; */
-    MPI_Request req[4], req_a[4], req_b[4];
+    MPI_Request req[numtasks], req_a[numtasks], req_b[numtasks];
+    /* MPI_Request req[4], req_a[4], req_b[4]; */
     /* MPI_Status stats[numtasks]; */
     /* if (rank == 0){ */
     /*     print_array(MAX_DIM, a); */
@@ -85,7 +86,7 @@ int main (int argc, char *argv[])
             a + partial_size*i,
             1,
             row_subarray,
-            aa_aux + i*partial_size*partial_size,
+            *aa_aux + i*partial_size*partial_size,
             partial_size * partial_size,
             MPI_INT,
             0,
@@ -97,7 +98,7 @@ int main (int argc, char *argv[])
             *b + partial_size*i,
             1,
             col_subarray,
-            bb_aux + i*partial_size*partial_size,
+            *bb_aux + i*partial_size*partial_size,
             partial_size * partial_size,
             MPI_INT,
             0,
@@ -105,28 +106,43 @@ int main (int argc, char *argv[])
             req_b + i
             );
     }
-    if (rank == 0)
-      printf("FINALIZACION ENVIO DATOS \n");
+    /* if (rank == 0) */
+    /*   printf("FINALIZACION ENVIO DATOS \n"); */
 
     for (int row = 0; row < numtasks; row++) {
         MPI_Wait(req_a + row, MPI_STATUS_IGNORE);
         for (int col = 0; col < numtasks; col++) {
             //TODO: haciendo wait mas veces de las necesarias
             MPI_Wait(req_b + col, MPI_STATUS_IGNORE);
+
             matmul(
                 partial_size,
-                aa_aux + row*partial_size*partial_size,
-                bb_aux + col*partial_size*partial_size,
+                (int (*)[partial_size]) (*aa_aux + row*partial_size*partial_size),
+                (int (*)[partial_size]) (*bb_aux + col*partial_size*partial_size),
                 MAX_DIM,
-                cc_aux + row*partial_size*MAX_DIM + col*partial_size
+                (int (*)[partial_size]) (*cc_aux + row*partial_size*MAX_DIM + col*partial_size)
                 );
-            if (rank == 0)
-              printf("COMIENZO REDUCCION ITERACION [%d][%d]\n", row, col);
+
+            /* if (rank == 0) */
+            /*     printf("COMIENZO REDUCCION ITERACION [%d][%d]\n", row, col); */
+
+            /* for (int i = 0; i < numtasks; i++) { */
+            /*     MPI_Barrier(MPI_COMM_WORLD); */
+            /*     if (rank == i) { */
+            /*         printf("\nRANK: %d\n", rank); */
+            /*         printf("aa: \n"); */
+            /*         print_array(partial_size, aa_aux); */
+            /*         printf("bb: \n"); */
+            /*         print_array(partial_size, bb_aux); */
+            /*         /\* printf("cc: \n"); *\/ */
+            /*         /\* print_array_v2(MAX_DIM, partial_size, (int (*)[partial_size]) (*cc_aux + row*partial_size*MAX_DIM + col*partial_size)); *\/ */
+            /*     } */
+            /* } */
         }
 
         MPI_Ireduce(
-            cc_aux[row],
-            c[row],
+            cc_aux[row * partial_size],
+            c[row * partial_size],
             MAX_DIM*partial_size,
             MPI_INT,
             MPI_SUM,
@@ -136,8 +152,8 @@ int main (int argc, char *argv[])
             );
     }
     MPI_Waitall(numtasks, req, MPI_STATUS_IGNORE);
-    if (rank == 0)
-      printf("FIN MATMUL\n");
+    /* if (rank == 0) */
+    /*   printf("FIN MATMUL\n"); */
 
     MPI_Barrier(MPI_COMM_WORLD);
     end = MPI_Wtime();
@@ -160,6 +176,16 @@ void print_array(int dim, int c[dim][dim])
 {
     for (int i = 0; i < dim; i++) {
         for (int j = 0; j < dim; j++) {
+            printf(" %6d", c[i][j]);
+        }
+        printf ("\n");
+    }
+}
+
+void print_array_v2(int dim1, int dim2, int c[dim1][dim2])
+{
+    for (int i = 0; i < dim2; i++) {
+        for (int j = 0; j < dim2; j++) {
             printf(" %6d", c[i][j]);
         }
         printf ("\n");
