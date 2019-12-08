@@ -17,14 +17,14 @@
 
 #include <string.h>
 
-#define MAX_DIM 2000
+/* #define MAX_DIM 2000 */
+#define MAX_DIM 1500
 /* #define MAX_DIM 16 */
 #define PROCS 4
 
 void print_array(int dim, int c[dim][dim]);
 
-void matmul(int dim, int aa[dim][dim], int bb[dim][dim], int max_dim,
-    int cc[max_dim][max_dim]);
+void matmul(int dim, int aa[dim][dim], int bb[dim][dim], int cc[dim][dim]);
 
 void matmul_v2(int dim, int max_dim, int aa[dim][dim], int bb[dim][dim],
     int cc[max_dim][max_dim]);
@@ -72,7 +72,6 @@ int main(int argc, char* argv[])
     int partial_size2 = partial_size * partial_size;
 
     MPI_Request req[numtasks * numtasks * partial_size], req_a[numtasks],
-    /* MPI_Request req[1], req_a[numtasks], */
         req_b[numtasks];
     MPI_Datatype subarray, col_subarray, row_subarray;
     int sizes[2] = { MAX_DIM, MAX_DIM }; /* size of global array */
@@ -174,13 +173,13 @@ int main(int argc, char* argv[])
         for (int row = 0; row < numtasks; row++) {
             MPI_Wait(req_a + row, MPI_STATUS_IGNORE);
             for (int col = 0; col < numtasks; col++) {
-                if (!row) MPI_Wait(req_b + col, MPI_STATUS_IGNORE);
+                if (!row)
+                    MPI_Wait(req_b + col, MPI_STATUS_IGNORE);
 
                 matmul(
                     partial_size,
                     (int(*)[partial_size])(*a + row * partial_size2),
                     (int(*)[partial_size])(*b + col * partial_size2),
-                    partial_size,
                     (int(*)[partial_size])(*(c + row) + col * partial_size2));
 
                 for (int i = 0; i < partial_size; i++)
@@ -308,22 +307,39 @@ void print_array_v2(int dim1, int dim2, int c[dim1][dim2])
     }
 }
 
-void matmul(int dim, int aa[dim][dim], int bb[dim][dim], int max_dim, int cc[max_dim][max_dim])
+void matmul(int partial_size, int aa[partial_size][partial_size], int bb[partial_size][partial_size], int cc[partial_size][partial_size])
 {
+    //TODO: Optimizar esto
     /* #pragma omp parallel for */
-    register int tmp = 0;
     int* ptr;
-    for (int i = 0; i < dim; i++) {
-        for (int j = 0; j < dim; j++) {
+    register int tmp = 0;
+    for (int j = 0; j < partial_size; j++) {
+        for (int i = 0; i < partial_size; i++) {
             tmp = 0;
             ptr = aa[i];
-            for (int k = 0; k < dim; k++) {
+            for (int k = 0; k < partial_size; k++) {
                 tmp += *(ptr + k) * bb[k][j];
             }
             cc[i][j] = tmp;
         }
     }
 }
+/* void matmul(int dim, int aa[dim][dim], int bb[dim][dim], int cc[dim][dim]) */
+/* { */
+/*     /\* #pragma omp parallel for *\/ */
+/*     register int tmp = 0; */
+/*     int* ptr; */
+/*     for (int i = 0; i < dim; i++) { */
+/*         for (int j = 0; j < dim; j++) { */
+/*             tmp = 0; */
+/*             ptr = aa[i]; */
+/*             for (int k = 0; k < dim; k++) { */
+/*                 tmp += *(ptr + k) * bb[k][j]; */
+/*             } */
+/*             cc[i][j] = tmp; */
+/*         } */
+/*     } */
+/* } */
 
 void matmul_v2(int dim, int max_dim, int aa[dim][max_dim], int bb[dim][max_dim], int cc[max_dim][max_dim])
 {
