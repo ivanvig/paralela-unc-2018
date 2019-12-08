@@ -84,13 +84,14 @@ int main (int argc, char *argv[])
             MPI_Scatter(*b + partial_size*col, 1, col_subarray, bb, partial_size * partial_size, MPI_INT, 0,MPI_COMM_WORLD);
 
             //TODO: Optimizar esto
-#pragma omp parallel for
+/* #pragma omp parallel for */
             for (int j = 0; j < partial_size; j++) {
                 for (int i = 0; i < partial_size; i++) {
-                    cc[i][j] = 0;
+                    register int tmp = 0;
                     for (int k = 0; k < partial_size; k++){
-                        cc[i][j] += aa[i][k] * bb[k][j];
+                        tmp += aa[i][k] * bb[k][j];
                     }
+                    cc[i][j] = tmp;
                 }
             }
 
@@ -131,8 +132,8 @@ int main (int argc, char *argv[])
 
     if (rank == 0){
         float time = end-start;
-        printf("\n RESULTADO FINAL\n");
-        print_array(MAX_DIM, c);
+        /* printf("\n RESULTADO FINAL\n"); */
+        /* print_array(MAX_DIM, c); */
         printf("Runtime = %f\n", time);
     }
 
