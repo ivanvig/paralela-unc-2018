@@ -6,11 +6,11 @@
 // #define LIST_SIZE 1610612736 //6 GB of ints
 //#define LIST_SIZE 209715200 //500 MB of ints
 // #define LIST_SIZE 1048576 // 1MB of ints
-#define LIST_SIZE (2 * 65536)
+// #define LIST_SIZE (2 * 65536)
 // #define LIST_SIZE 65536
 // #define LIST_SIZE 49152
 // #define LIST_SIZE 49152
-// #define LIST_SIZE 16384
+#define LIST_SIZE 16384
 // #define LIST_SIZE (16384 + 8192)
 // #define LIST_SIZE (8192 + 4096 + 2048)
 // #define LIST_SIZE (8192 + 4096)
@@ -127,7 +127,7 @@ int main (){
   int8_t * random_numbers_global = (int8_t *) malloc(sizeof(int8_t)*LIST_SIZE);
   int8_t * random_numbers_shared = (int8_t *) malloc(sizeof(int8_t)*LIST_SIZE);
 
-  printf("Generando lista aleatoria de %i elementos\n", LIST_SIZE);
+  // printf("Generando lista aleatoria de %i elementos\n", LIST_SIZE);
   for (int i = 0; i<LIST_SIZE; i++){
     // random_numbers_global[i] = rand()%20;
     random_numbers_global[i] = (int8_t) LIST_SIZE - i;
@@ -140,57 +140,57 @@ int main (){
   int n_prints = LIST_SIZE;
   int elem;
 
-  printf("Lista antes de gpu: Elementos desde %i hasta %i \n", start_print, start_print+n_prints);
-  for (int i=start_print; i< start_print+n_prints; i++){
-    printf("%i ", random_numbers_global[i]);
-  }
-  printf("\n");
+  // printf("Lista antes de gpu: Elementos desde %i hasta %i \n", start_print, start_print+n_prints);
+  // for (int i=start_print; i< start_print+n_prints; i++){
+  // printf("%i ", random_numbers_global[i]);
+  // }
+  // printf("\n");
 
   //*************************************
   // ODD-EVEN BUBBLE SORT CON GLOBAL MEM
   //*************************************
 
-  printf("Odd even bubble sort con memoria global \n");
-  // odd_even_bubble_sort_global(random_numbers_global, LIST_SIZE);
+  // printf("Odd even bubble sort con memoria global \n");
+  odd_even_bubble_sort_global(random_numbers_global, LIST_SIZE);
 
-  printf("Despues de gpu (global): Elementos desde %i hasta %i\n", start_print, start_print+n_prints);
-  for (int i=start_print; i< start_print+n_prints; i++){
-    printf("%i ", random_numbers_global[i]);
-  }
-  printf("\n");
+  //printf("Despues de gpu (global): Elementos desde %i hasta %i\n", start_print, start_print+n_prints);
+  //for (int i=start_print; i< start_print+n_prints; i++){
+  //printf("%i ", random_numbers_global[i]);
+  //}
+  //printf("\n");
 
-  printf("Chequeando si la lista con global mem esta ordenada... \n");
-  if (elem = assert_sorted(random_numbers_global, LIST_SIZE)) {
-    printf("LISTA MAL ORDENADA EN ELEM N %i \n", elem);
-    for (int i=((elem-100) > 0)*(elem-100); i < (((elem+100) < LIST_SIZE)*(elem+100) + ((elem+100) >= LIST_SIZE)*LIST_SIZE); i++)
-      printf("%i ", random_numbers_global[i]);
-    printf("\n");
-  } else
-    printf("LISTA CON GLOBAL MEM BIEN ORDENADA \n");
+  //printf("Chequeando si la lista con global mem esta ordenada... \n");
+  //if (elem = assert_sorted(random_numbers_global, LIST_SIZE)) {
+  //  printf("LISTA MAL ORDENADA EN ELEM N %i \n", elem);
+  //  for (int i=((elem-100) > 0)*(elem-100); i < (((elem+100) < LIST_SIZE)*(elem+100) + ((elem+100) >= LIST_SIZE)*LIST_SIZE); i++)
+  //    printf("%i ", random_numbers_global[i]);
+  //  printf("\n");
+  //} else
+  //  printf("LISTA CON GLOBAL MEM BIEN ORDENADA \n");
 
-  printf("Finalizado sort con memoria global \n");
+  //printf("Finalizado sort con memoria global \n");
 
   //*************************************
   // ODD-EVEN BUBBLE SORT CON SHARED MEM
   //*************************************
 
-  printf("Odd even bubble sort con memoria shared \n");
+  // printf("Odd even bubble sort con memoria shared \n");
   odd_even_bubble_sort_shared(random_numbers_shared, LIST_SIZE);
 
-  printf("Despues de gpu (shared): Elementos desde %i hasta %i\n", start_print, start_print+n_prints);
-  for (int i=start_print; i< start_print+n_prints; i++){
-    printf("%i ", random_numbers_shared[i]);
-  }
-  printf("\n");
+  // printf("Despues de gpu (shared): Elementos desde %i hasta %i\n", start_print, start_print+n_prints);
+  // for (int i=start_print; i< start_print+n_prints; i++){
+    // printf("%i ", random_numbers_shared[i]);
+  // }
+  // printf("\n");
 
-  printf("Chequeando si la lista con shared mem esta ordenada... \n");
-  if (elem = assert_sorted(random_numbers_shared, LIST_SIZE)) {
-    printf("LISTA MAL ORDENADA EN ELEM N %i \n", elem);
-    for (int i=((elem-100) > 0)*(elem-100); i < (((elem+100) < LIST_SIZE)*(elem+100) + ((elem+100) >= LIST_SIZE)*LIST_SIZE); i++)
-      printf("%i ", random_numbers_shared[i]);
-    printf("\n");
-  } else
-    printf("LISTA CON SHARED MEM BIEN ORDENADA \n");
+  // printf("Chequeando si la lista con shared mem esta ordenada... \n");
+  // if (elem = assert_sorted(random_numbers_shared, LIST_SIZE)) {
+    // printf("LISTA MAL ORDENADA EN ELEM N %i \n", elem);
+    // for (int i=((elem-100) > 0)*(elem-100); i < (((elem+100) < LIST_SIZE)*(elem+100) + ((elem+100) >= LIST_SIZE)*LIST_SIZE); i++)
+      // printf("%i ", random_numbers_shared[i]);
+    // printf("\n");
+  // } else
+    // printf("LISTA CON SHARED MEM BIEN ORDENADA \n");
 
   list_to_file("ordenada", random_numbers_shared, sizeof(int8_t)*LIST_SIZE);
   return 0;
@@ -211,11 +211,11 @@ void odd_even_bubble_sort_global (int8_t * list, int32_t list_size)
   CUDA_CALL(cudaMalloc((void **) &device_list_ref, list_size*sizeof(int8_t)));
   CUDA_CALL(cudaMemcpy(device_list_ref, list, list_size*sizeof(int8_t), cudaMemcpyHostToDevice));
 
-  printf("Llamando al kernel con global memory... \n");
+  // printf("Llamando al kernel con global memory... \n");
   CUDA_CALL(cudaEventRecord(start));
   for (int i = 0; i < LIST_SIZE; i++){
-    if (i%(LIST_SIZE/10)==0)
-      printf("%d/100...\n", 10*i/(LIST_SIZE/10));
+    // if (i%(LIST_SIZE/10)==0)
+      // printf("%d/100...\n", 10*i/(LIST_SIZE/10));
 
     global_koronel<<<dimGrid, dimBlock>>>
       (
@@ -258,11 +258,11 @@ void odd_even_bubble_sort_shared (int8_t * list, int32_t list_size)
   CUDA_CALL(cudaMalloc((void **) &device_list_ref, list_size*sizeof(int8_t)));
   CUDA_CALL(cudaMemcpy(device_list_ref, list, list_size*sizeof(int8_t), cudaMemcpyHostToDevice));
 
-  printf("Llamando al kernel con shared memory... \n");
+  // printf("Llamando al kernel con shared memory... \n");
   CUDA_CALL(cudaEventRecord(start));
   for (int i = 0; i < LIST_SIZE; i++){
-    if (i%(LIST_SIZE/10)==0)
-      printf("%d/100...\n", 10*i/(LIST_SIZE/10));
+    // if (i%(LIST_SIZE/10)==0)
+      // printf("%d/100...\n", 10*i/(LIST_SIZE/10));
 
     shared_koronel<<<dimGrid, dimBlock>>>
       (
