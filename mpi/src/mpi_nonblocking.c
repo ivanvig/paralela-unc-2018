@@ -311,11 +311,14 @@ void print_array_v2(int dim1, int dim2, int c[dim1][dim2])
 void matmul(int dim, int aa[dim][dim], int bb[dim][dim], int max_dim, int cc[max_dim][max_dim])
 {
     /* #pragma omp parallel for */
+    register int tmp = 0;
+    int* ptr;
     for (int i = 0; i < dim; i++) {
         for (int j = 0; j < dim; j++) {
-            register int tmp = 0;
+            tmp = 0;
+            ptr = aa[i];
             for (int k = 0; k < dim; k++) {
-                tmp += aa[i][k] * bb[k][j];
+                tmp += *(ptr + k) * bb[k][j];
             }
             cc[i][j] = tmp;
         }
@@ -325,11 +328,14 @@ void matmul(int dim, int aa[dim][dim], int bb[dim][dim], int max_dim, int cc[max
 void matmul_v2(int dim, int max_dim, int aa[dim][max_dim], int bb[dim][max_dim], int cc[max_dim][max_dim])
 {
     /* #pragma omp parallel for */
+    register int tmp = 0;
+    int* ptr;
     for (int i = 0; i < dim; i++) {
         for (int j = 0; j < dim; j++) {
-            register int tmp = 0;
+            tmp = 0;
+            ptr = aa[i];
             for (int k = 0; k < dim; k++) {
-                tmp += aa[i][k] * bb[k][j];
+                tmp += *(ptr + k) * bb[k][j];
             }
             cc[i][j] = tmp;
         }
