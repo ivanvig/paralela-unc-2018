@@ -17,8 +17,8 @@
 
 #include <string.h>
 
-/* #define MAX_DIM 2000 */
-#define MAX_DIM 1500
+#define MAX_DIM 2000
+/* #define MAX_DIM 1500 */
 /* #define MAX_DIM 16 */
 #define PROCS 4
 
