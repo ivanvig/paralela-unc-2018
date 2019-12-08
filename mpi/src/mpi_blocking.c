@@ -138,15 +138,15 @@ void print_array(int dim, int c[dim][dim])
 
 void matmul(int partial_size, int aa[partial_size][partial_size], int bb[partial_size][partial_size], int cc[partial_size][partial_size])
 {
-    //TODO: Optimizar esto
     /* #pragma omp parallel for */
+    int* ptr;
     register int tmp = 0;
     for (int j = 0; j < partial_size; j++) {
         for (int i = 0; i < partial_size; i++) {
             tmp = 0;
+            ptr = aa[i];
             for (int k = 0; k < partial_size; k++) {
-                /* tmp += aa[i][k] * bb[k][j]; */
-                tmp += aa[i][k] * bb[j][k];
+                tmp += *(ptr + k) * bb[k][j];
             }
             cc[i][j] = tmp;
         }
