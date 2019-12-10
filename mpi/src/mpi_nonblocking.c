@@ -17,7 +17,9 @@
 
 #include <string.h>
 
-#define MAX_DIM 2000
+/* #define MAX_DIM 2000 */
+char* asd;
+unsigned int MAX_DIM;
 /* #define MAX_DIM 1500 */
 /* #define MAX_DIM 16 */
 #define PROCS 4
@@ -33,6 +35,7 @@ void print_array_v2(int dim1, int dim2, int c[dim1][dim2]);
 
 int main(int argc, char* argv[])
 {
+    MAX_DIM = strtol(getenv("MAX_DEPTH"), &asd, 10);
     int rank, numtasks; //tag = 1;
     double start, end;
     int a[MAX_DIM][MAX_DIM];

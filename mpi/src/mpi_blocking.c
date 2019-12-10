@@ -17,15 +17,19 @@
 
 #include <string.h>
 
-#define MAX_DIM 2000
+/* #define MAX_DIM 2000 */
 /* #define MAX_DIM 8 */
 #define PROCS 4
+
+char* asd;
+unsigned int MAX_DIM;
 
 void print_array(int dim, int c[dim][dim]);
 void matmul(int partial_size, int aa[partial_size][partial_size], int bb[partial_size][partial_size], int cc[partial_size][partial_size]);
 
 int main(int argc, char* argv[])
 {
+    MAX_DIM = strtol(getenv("MAX_DEPTH"), &asd, 10);
     int rank, numtasks; //tag = 1;
     double start, end;
     int a[MAX_DIM][MAX_DIM];
