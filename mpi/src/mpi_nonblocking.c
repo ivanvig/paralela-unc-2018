@@ -35,7 +35,7 @@ void print_array_v2(int dim1, int dim2, int c[dim1][dim2]);
 
 int main(int argc, char* argv[])
 {
-    MAX_DIM = strtol(getenv("MAX_DEPTH"), &asd, 10);
+    MAX_DIM = strtol(getenv("MAX_DIM"), &asd, 10);
     int rank, numtasks; //tag = 1;
     double start, end;
     int a[MAX_DIM][MAX_DIM];
