@@ -58,7 +58,7 @@ int main(int argc, char* argv[])
     int partial_size = MAX_DIM / numtasks;
     int partial_size2 = partial_size * partial_size;
     int aa[MAX_DIM][MAX_DIM], bb[MAX_DIM][MAX_DIM], cc[MAX_DIM][MAX_DIM];
-    int dd[MAX_DIM][MAX_DIM]; // TODO: solo test, borrar, o no?
+    /* int dd[MAX_DIM][MAX_DIM]; // TODO: solo test, borrar, o no? */
 
     MPI_Request req[numtasks * numtasks * partial_size], req_a[numtasks],
             req_b[numtasks];
@@ -100,7 +100,109 @@ int main(int argc, char* argv[])
         MPI_COMM_WORLD,
         &req_b[0]);
 
-    for (int row = 0; row < numtasks; row++) {
+    MPI_Iscatter(
+        a + partial_size * 0,
+        1,
+        row_subarray,
+        *aa + (0 + 1) * partial_size2,
+        partial_size2,
+        MPI_INT,
+        0,
+        MPI_COMM_WORLD,
+        &req_a[0 + 1]);
+
+    MPI_Wait(req_a, MPI_STATUS_IGNORE);
+
+    MPI_Iscatter(
+        *b + partial_size * 0,
+        1,
+        col_subarray,
+        *bb + (0 + 1) * partial_size2,
+        partial_size2,
+        MPI_INT,
+        0,
+        MPI_COMM_WORLD,
+        &req_b[0 + 1]);
+
+    MPI_Wait(req_b + 0, MPI_STATUS_IGNORE);
+
+    matmul(
+        partial_size,
+        (int(*)[partial_size])(*aa),
+        (int(*)[partial_size])(*bb + 0 * partial_size2),
+        (int(*)[partial_size])(*cc + 0 * partial_size2));
+
+    for (int i = 0; i < partial_size; i++) {
+        int * ptr_out = *cc + (0 * numtasks + 0) * partial_size2;
+        MPI_Ireduce(
+            ptr_out + i * partial_size,
+            *(c + 0 * partial_size + i) + 0 * partial_size,
+            partial_size,
+            MPI_INT,
+            MPI_SUM,
+            0,
+            MPI_COMM_WORLD,
+            req + i + (0 * numtasks + 0) * partial_size);
+    }
+
+    for (int col = 1; col < numtasks - 1; col++) {
+
+        MPI_Iscatter(
+            *b + partial_size * col,
+            1,
+            col_subarray,
+            *bb + (col + 1) * partial_size2,
+            partial_size2,
+            MPI_INT,
+            0,
+            MPI_COMM_WORLD,
+            &req_b[col + 1]);
+
+        MPI_Wait(req_b + col, MPI_STATUS_IGNORE);
+
+        matmul(
+            partial_size,
+            (int(*)[partial_size])(*aa),
+            (int(*)[partial_size])(*bb + col * partial_size2),
+            (int(*)[partial_size])(*cc + col * partial_size2));
+
+        MPI_Waitall(partial_size, req + (0 * numtasks + col - 1) * partial_size, MPI_STATUS_IGNORE);
+        for (int i = 0; i < partial_size; i++) {
+            int * ptr_out = *cc + (0 * numtasks + col) * partial_size2;
+            MPI_Ireduce(
+                ptr_out + i * partial_size,
+                *(c + 0 * partial_size + i) + col * partial_size,
+                partial_size,
+                MPI_INT,
+                MPI_SUM,
+                0,
+                MPI_COMM_WORLD,
+                req + i + (0 * numtasks + col) * partial_size);
+        }
+    }
+    MPI_Wait(req_b + numtasks - 1, MPI_STATUS_IGNORE);
+
+    matmul(
+        partial_size,
+        (int(*)[partial_size])(*aa),
+        (int(*)[partial_size])(*bb + (numtasks - 1) * partial_size2),
+        (int(*)[partial_size])(*cc + (numtasks - 1) * partial_size2));
+
+    MPI_Waitall(partial_size, req + (0 * numtasks + (numtasks - 1) - 1) * partial_size, MPI_STATUS_IGNORE);
+    for (int i = 0; i < partial_size; i++) {
+        int * ptr_out = *cc + (0 * numtasks + (numtasks - 1)) * partial_size2;
+        MPI_Ireduce(
+            ptr_out + i * partial_size,
+            *(c + 0 * partial_size + i) + (numtasks - 1) * partial_size,
+            partial_size,
+            MPI_INT,
+            MPI_SUM,
+            0,
+            MPI_COMM_WORLD,
+            req + i + (0 * numtasks + (numtasks - 1)) * partial_size);
+    }
+
+    for (int row = 1; row < numtasks - 1; row++) {
         MPI_Iscatter(
             a + partial_size * row,
             1,
@@ -114,25 +216,28 @@ int main(int argc, char* argv[])
 
         MPI_Wait(req_a + row, MPI_STATUS_IGNORE);
 
-        if (row)
-            MPI_Waitall(partial_size, req + (row * numtasks - 1) * partial_size, MPI_STATUS_IGNORE);
+        MPI_Waitall(partial_size, req + (row * numtasks - 1) * partial_size, MPI_STATUS_IGNORE);
 
-        for (int col = 0; col < numtasks; col++) {
+        matmul(
+            partial_size,
+            (int(*)[partial_size])(*aa + row * partial_size2),
+            (int(*)[partial_size])(*bb + 0 * partial_size2),
+            (int(*)[partial_size])(*cc + (row * numtasks + 0) * partial_size2));
 
-            if (!row) {
-                MPI_Iscatter(
-                    *b + partial_size * col,
-                    1,
-                    col_subarray,
-                    *bb + (col + 1) * partial_size2,
-                    partial_size2,
-                    MPI_INT,
-                    0,
-                    MPI_COMM_WORLD,
-                    &req_b[col + 1]);
+        for (int i = 0; i < partial_size; i++) {
+            int* ptr_out = *cc + (row * numtasks + 0) * partial_size2;
+            MPI_Ireduce(
+                ptr_out + i * partial_size,
+                *(c + row * partial_size + i) + 0 * partial_size,
+                partial_size,
+                MPI_INT,
+                MPI_SUM,
+                0,
+                MPI_COMM_WORLD,
+                req + i + (row * numtasks + 0) * partial_size);
+        }
 
-                MPI_Wait(req_b + col, MPI_STATUS_IGNORE);
-            }
+        for (int col = 1; col < numtasks; col++) {
 
             matmul(
                 partial_size,
@@ -140,8 +245,6 @@ int main(int argc, char* argv[])
                 (int(*)[partial_size])(*bb + col * partial_size2),
                 (int(*)[partial_size])(*cc + (row * numtasks + col) * partial_size2));
 
-            if (col)
-                MPI_Waitall(partial_size, req + (row * numtasks + col - 1) * partial_size, MPI_STATUS_IGNORE);
             for (int i = 0; i < partial_size; i++) {
                 int * ptr_out = *cc + (row * numtasks + col) * partial_size2;
                 MPI_Ireduce(
@@ -154,6 +257,51 @@ int main(int argc, char* argv[])
                     MPI_COMM_WORLD,
                     req + i + (row * numtasks + col) * partial_size);
             }
+        }
+    }
+
+    MPI_Wait(req_a + (numtasks - 1), MPI_STATUS_IGNORE);
+
+    MPI_Waitall(partial_size, req + ((numtasks - 1) * numtasks - 1) * partial_size, MPI_STATUS_IGNORE);
+
+    matmul(
+        partial_size,
+        (int(*)[partial_size])(*aa + (numtasks - 1) * partial_size2),
+        (int(*)[partial_size])(*bb + 0 * partial_size2),
+        (int(*)[partial_size])(*cc + ((numtasks - 1) * numtasks + 0) * partial_size2));
+
+    for (int i = 0; i < partial_size; i++) {
+        int* ptr_out = *cc + ((numtasks - 1) * numtasks + 0) * partial_size2;
+        MPI_Ireduce(
+            ptr_out + i * partial_size,
+            *(c + (numtasks - 1) * partial_size + i) + 0 * partial_size,
+            partial_size,
+            MPI_INT,
+            MPI_SUM,
+            0,
+            MPI_COMM_WORLD,
+            req + i + ((numtasks - 1) * numtasks + 0) * partial_size);
+    }
+
+    for (int col = 1; col < numtasks; col++) {
+
+        matmul(
+            partial_size,
+            (int(*)[partial_size])(*aa + (numtasks - 1) * partial_size2),
+            (int(*)[partial_size])(*bb + col * partial_size2),
+            (int(*)[partial_size])(*cc + ((numtasks - 1) * numtasks + col) * partial_size2));
+
+        for (int i = 0; i < partial_size; i++) {
+            int * ptr_out = *cc + ((numtasks - 1) * numtasks + col) * partial_size2;
+            MPI_Ireduce(
+                ptr_out + i * partial_size,
+                *(c + (numtasks - 1) * partial_size + i) + col * partial_size,
+                partial_size,
+                MPI_INT,
+                MPI_SUM,
+                0,
+                MPI_COMM_WORLD,
+                req + i + ((numtasks - 1) * numtasks + col) * partial_size);
         }
     }
 
