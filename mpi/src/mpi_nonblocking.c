@@ -38,10 +38,10 @@ int main(int argc, char* argv[])
 
     for (int i = 0; i < MAX_DIM; i++) {
         for (int j = 0; j < MAX_DIM; j++) {
-            /* a[i][j] = i*MAX_DIM + j; */
-            /* b[i][j] = i*MAX_DIM + j; */
-            a[i][j] = 1;
-            b[i][j] = 1;
+            a[i][j] = i*MAX_DIM + j;
+            b[i][j] = i*MAX_DIM + j;
+            /* a[i][j] = 1; */
+            /* b[i][j] = 1; */
         }
     }
 
@@ -101,7 +101,7 @@ int main(int argc, char* argv[])
         &req_b[0]);
 
     MPI_Iscatter(
-        a + partial_size * 0,
+        a + partial_size,
         1,
         row_subarray,
         *aa + (0 + 1) * partial_size2,
@@ -114,7 +114,7 @@ int main(int argc, char* argv[])
     MPI_Wait(req_a, MPI_STATUS_IGNORE);
 
     MPI_Iscatter(
-        *b + partial_size * 0,
+        *b + partial_size,
         1,
         col_subarray,
         *bb + (0 + 1) * partial_size2,
@@ -148,7 +148,7 @@ int main(int argc, char* argv[])
     for (int col = 1; col < numtasks - 1; col++) {
 
         MPI_Iscatter(
-            *b + partial_size * col,
+            *b + partial_size * (col + 1),
             1,
             col_subarray,
             *bb + (col + 1) * partial_size2,
@@ -204,7 +204,7 @@ int main(int argc, char* argv[])
 
     for (int row = 1; row < numtasks - 1; row++) {
         MPI_Iscatter(
-            a + partial_size * row,
+            a + partial_size * (row + 1),
             1,
             row_subarray,
             *aa + (row + 1) * partial_size2,
@@ -305,6 +305,7 @@ int main(int argc, char* argv[])
         }
     }
 
+    /* MPI_Waitall(partial_size, req + ((numtasks - 1) * numtasks + numtasks - 1) * partial_size, MPI_STATUS_IGNORE); */
     MPI_Barrier(MPI_COMM_WORLD);
     end = MPI_Wtime();
 
