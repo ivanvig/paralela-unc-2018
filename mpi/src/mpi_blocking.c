@@ -57,7 +57,7 @@ int main(int argc, char* argv[])
     //TODO: deberia andar esta declaracion de los arreglos???? Parece que a partir de C99 si
     int partial_size = MAX_DIM / numtasks;
     int aa[partial_size][partial_size], bb[partial_size][partial_size], cc[partial_size][partial_size];
-    int dd[partial_size][partial_size]; // TODO: solo test, borrar, o no?
+    /* int dd[partial_size][partial_size]; // TODO: solo test, borrar, o no? */
 
     MPI_Datatype subarray, col_subarray, row_subarray;
     int sizes[2] = { MAX_DIM, MAX_DIM }; /* size of global array */
@@ -100,13 +100,14 @@ int main(int argc, char* argv[])
             /*     } */
             /* } */
 
+            for (int i = 0; i < partial_size; i++)
+              MPI_Reduce(cc[i], *(c + row * partial_size + i) + col * partial_size, partial_size, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
             //TODO: mejor forma de hacer esto?
-            MPI_Reduce(cc, dd, partial_size * partial_size, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
-            if (rank == 0) {
-                for (int i = 0; i < partial_size; i++) {
-                    memcpy(&c[row * partial_size + i][col * partial_size], dd[i], sizeof(int) * partial_size);
-                }
-            }
+            /* if (rank == 0) { */
+            /*     for (int i = 0; i < partial_size; i++) { */
+            /*         memcpy(&c[row * partial_size + i][col * partial_size], dd[i], sizeof(int) * partial_size); */
+            /*     } */
+            /* } */
             /* if (rank == 0){ */
             /*     printf("\n RESULTADO PARCIAL\n"); */
             /*     print_array(partial_size, dd); */
